@@ -52,9 +52,9 @@ pub struct AddAsset<'info> {
 }
 
 pub fn handler(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
-    let idx = ctx.accounts.allassets.last_idx;
+    let idx = ctx.accounts.allassets.size_assets;
     require!(idx < MAX_ASSETS, ErrorCode::AllAsssetsIsFull);
-    ctx.accounts.allassets.last_idx += 1;
+    ctx.accounts.allassets.size_assets += 1;
     let allassets = &mut ctx.accounts.allassets.assets;
     let asset = &mut allassets[idx as usize];
     // Verify asset is not initialized yet
@@ -62,8 +62,6 @@ pub fn handler(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
     asset.mint = ctx.accounts.mint_asset.key();
     asset.vault = ctx.accounts.vault_asset.key();
     asset.multiplier = multiplier;  
-    // At first, the best tick is the lowest one
-    asset.orderbook.best_idx = 0;
 
     Ok(())
 }

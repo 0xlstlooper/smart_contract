@@ -39,7 +39,7 @@ pub fn handler(ctx: Context<Initialize>, start_tick: u64, tick_size: u64) -> Res
     let config = &mut ctx.accounts.config;
     config.admin = ctx.accounts.payer.key();
     let allassets = &mut ctx.accounts.allassets;
-    allassets.last_idx = 0;
+    allassets.size_assets = 0;
     allassets.start_tick = start_tick;
     allassets.tick_size = tick_size;
     // config.jitosol_mint = ctx.accounts.jitosol_mint.key();

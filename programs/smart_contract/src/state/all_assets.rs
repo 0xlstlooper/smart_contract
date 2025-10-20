@@ -12,7 +12,6 @@ The last index is the highest APY offered - index i corresponds to start_tick + 
 #[derive(InitSpace)]
 pub struct Orderbook {
     pub slots: [u64; ORDERBOOK_SIZE],
-    pub best_idx: u64, // index of the current best tick which has some liquidity
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
@@ -26,12 +25,17 @@ pub struct AssetInfo {
 #[account]
 #[derive(InitSpace)]
 pub struct AllAssets {
-    pub assets: [AssetInfo; MAX_ASSETS as usize],
-    pub last_idx: u64,
-    // Information shared accross all the orderbooks
+    pub size_assets: u64,
+    pub assets: [AssetInfo; MAX_ASSETS as usize], // Array filled only until size_assets - todo le transformer en vec
+    // Information shared across all the orderbooks
     pub start_tick: u64,
     pub tick_size: u64,
 }
+
+/* Invariant of the structure:
+todo
+
+*/
 
 impl AllAssets {
     // Returns (best_tick, index of the related asset, liquidity of this tick of this asset)
@@ -40,30 +44,33 @@ impl AllAssets {
         let mut best_offer: Option<(u64, usize, u64)> = None;
 
         // Iterate through all the assets that have been added
-        for i in 0..self.last_idx as usize {
+        for i in 0..self.size_assets as usize {
             let asset = &self.assets[i];
             let orderbook = &asset.orderbook;
             
-            // Get the best tick index and the liquidity available at that tick for the current asset
-            let best_tick_idx = orderbook.best_idx as usize;
-            let liquidity = orderbook.slots[best_tick_idx as usize];
+            // Iterate backwards through the orderbook slots to find the highest APY with liquidity for this asset
+            for j in (0..ORDERBOOK_SIZE).rev() {
+                let liquidity = orderbook.slots[j];
 
-            // We only consider this asset if there is liquidity at its best tick
-            if liquidity > 0 {
-                // Calculate the APY for the current asset's best tick
-                let current_apy = self.start_tick + (best_tick_idx as u64) * self.tick_size;
+                // If we find the highest tick with liquidity for this asset, we can check if it's the new best overall
+                if liquidity > 0 {
+                    let current_apy = self.start_tick + (j as u64) * self.tick_size;
 
-                match best_offer {
-                    Some((best_apy_so_far, _, _)) => {
-                        // If the current asset's APY is better than the best we've seen, update it
-                        if current_apy > best_apy_so_far {
+                    match best_offer {
+                        Some((best_apy_so_far, _, _)) => {
+                            // If the current asset's best APY is better than the best we've seen, update it
+                            if current_apy > best_apy_so_far {
+                                best_offer = Some((current_apy, i, liquidity));
+                            }
+                        }
+                        None => {
+                            // If this is the first offer with liquidity we've found, it's the best by default
                             best_offer = Some((current_apy, i, liquidity));
                         }
                     }
-                    None => {
-                        // If this is the first asset with liquidity we've found, it's the best by default
-                        best_offer = Some((current_apy, i, liquidity));
-                    }
+                    
+                    // Once we've found the best tick for this asset, we can move to the next asset
+                    break;
                 }
             }
         }
@@ -72,15 +79,98 @@ impl AllAssets {
         best_offer.ok_or_else(|| error!(ErrorCode::NoLiquidityAvailable))
     }
 
+    // Takes a parameter amount in SOL to split on the orderbook by selecting the best APY available iteratively
+    // Example: if the orderbook has 500 at 120% and 300 at 130%, and we want to split 600,
+    //  we will take 500 at 120% and 100 at 130%
+    // Need to return an array of (tick_index, amount), which represents for each assets
+    //  upon which tick we selected their liquidity, and what amount we took from it
+    // So: the sum all amounts must be equal to the input amount
+    // Must be a vector of size allassets.size_assets
+    pub fn split_lenders_sol(&self, amount: u64) -> Result<Vec<(u64, u64)>> {
+        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+        Ok(result)
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // Just return a default AllAssets for testing
+    fn create_default_all_assets() -> AllAssets {
+        AllAssets {
+            assets: [
+                AssetInfo {
+                    mint: Pubkey::default(),
+                    vault: Pubkey::default(),
+                    multiplier: 1,
+                    orderbook: Orderbook {
+                        slots: [0; ORDERBOOK_SIZE],
+                    },
+                },
+                AssetInfo {
+                    mint: Pubkey::default(),
+                    vault: Pubkey::default(),
+                    multiplier: 1,
+                    orderbook: Orderbook {
+                        slots: [0; ORDERBOOK_SIZE],
+                    },
+                },
+            ],
+            size_assets: 2, // 2 because we have 2 assets listed in this structure
+            start_tick: 100,
+            tick_size: 10,
+        }
+    }
+
     #[test]
-    fn test_double() {
-        // let s = MyStruct { value: 5 };
-        // assert_eq!(s.double(), 10);
+    fn test_current_best_apy() {
+        let mut all_assets = create_default_all_assets();
+
+        // Set up first asset with liquidity at tick index 0 (APY = 100)
+        all_assets.assets[0].orderbook.slots[0] = 500;
+
+        // Set up second asset with liquidity at tick index 3 (APY = 130)
+        all_assets.assets[1].orderbook.slots[3] = 300;
+
+        let result = all_assets.current_best_apy().unwrap();
+        assert_eq!(result, (130, 1, 300)); // Expecting APY=130 from asset index 1 with liquidity 300
+    }
+
+    #[test]
+    fn test_split_lenders_sol() {
+        let mut all_assets = create_default_all_assets();
+
+        all_assets.assets[0].orderbook.slots[0] = 500;
+        all_assets.assets[0].orderbook.slots[1] = 400;
+        all_assets.assets[0].orderbook.slots[2] = 100;
+        // Orderbook for asset0: [500, 400, 100, 0, 0, 0, 0, 0, 0, 0]
+        // Aka, 500amount of liquidity at tick 0 (100%), 400 at tick 1 (110%), 100 at tick 2 (120%)
+
+        let result = all_assets.split_lenders_sol(600).unwrap();
+        // For asset0, we should take 500 from tick 0 and 100 from tick 1
+        // so the result for asset0 is (1, 600)
+        // For asset1, there is no liquidity, so (0, 0) - but it doesnt matter so if your implem returns smth else when the amount of liquidity is 0 its correct also and just change the test
+        assert_eq!(result, vec![(1, 600), (0, 0)]);
+
+        let result = all_assets.split_lenders_sol(400).unwrap();
+        assert_eq!(result, vec![(1, 400), (0, 0)]);
+
+        // Orderbook for asset1: [100, 100, 200, 300, 0, 0, 0, 0, 0, 0]
+        all_assets.assets[1].orderbook.slots[0] = 100;
+        all_assets.assets[1].orderbook.slots[1] = 100;
+        all_assets.assets[1].orderbook.slots[2] = 200;
+        all_assets.assets[1].orderbook.slots[3] = 300;
+        // Aka, 100amount of liquidity at tick 0 (100%), 100 at tick 1 (110%), 200 at tick 2 (120%), 300 at tick 3 (130%)
+
+        let result = all_assets.split_lenders_sol(100).unwrap();
+        // The best APY is now from asset1 at tick 3, so we should take 100 from there
+        assert_eq!(result, vec![(0, 0), (3, 100)]);
+
+        let result = all_assets.split_lenders_sol(600).unwrap();
+        // We should take 300 from tick 3 of asset1, we now have 300 left to split
+        // The next best APY is tick 2 of asset1, so we take 200 from there, 100 left
+        // The next best APY is tick 2 of asset0, so we take 100 from there, 0 left - done
+        assert_eq!(result, vec![(2, 100), (3, 500)]);
     }
 }

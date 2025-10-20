@@ -73,7 +73,7 @@ describe("test place bid", () => {
     const allAssetsAccount = await program.account.allAssets.fetch(allAssetsPda);
     assert.ok(allAssetsAccount.startTick.eq(startTick), "Start tick should match");
     assert.ok(allAssetsAccount.tickSize.eq(tickSize), "Tick size should match");
-    assert.equal(allAssetsAccount.lastIdx, 0, "Initial last index should be 0");
+    assert.equal(allAssetsAccount.sizeAssets, 0, "Initial last index should be 0");
   });
 
   it("Adds the first asset", async () => {
@@ -122,7 +122,7 @@ describe("test place bid", () => {
 
     // Verify state
     const allAssetsAccount = await program.account.allAssets.fetch(allAssetsPda);
-    assert.equal(allAssetsAccount.lastIdx, 1, "Last index should be 1");
+    assert.equal(allAssetsAccount.sizeAssets, 1, "Last index should be 1");
     const assetInfo = allAssetsAccount.assets[0];
     assert.ok(assetInfo.mint.equals(mintAsset1), "Mint public key should match");
     assert.ok(assetInfo.vault.equals(vaultAssetPda1), "Vault public key should match");
@@ -169,7 +169,7 @@ describe("test place bid", () => {
 
     // Verify state
     const allAssetsAccount = await program.account.allAssets.fetch(allAssetsPda);
-    assert.equal(allAssetsAccount.lastIdx, 2, "Last index should be 2 after adding second asset");
+    assert.equal(allAssetsAccount.sizeAssets, 2, "Last index should be 2 after adding second asset");
     const assetInfo = allAssetsAccount.assets[1];
     assert.ok(assetInfo.mint.equals(mintAsset2), "Mint public key for asset 2 should match");
   });

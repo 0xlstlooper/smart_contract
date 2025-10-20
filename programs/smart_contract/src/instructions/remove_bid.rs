@@ -74,13 +74,6 @@ pub fn handler(ctx: Context<RemoveBid>) -> Result<()> {
     let orderbook = &mut ctx.accounts.orderbook;
     orderbook.slots[slot_index] = orderbook.slots[slot_index].checked_sub(amount).unwrap();
 
-    if orderbook.slots[slot_index] == 0 && slot_index as u64 == orderbook.best_idx {
-        // Mettre à jour le meilleur tick si nécessaire
-        while orderbook.best_idx > 0 && orderbook.slots[orderbook.best_idx as usize] == 0 {
-            orderbook.best_idx -= 1;
-        }
-    }
-
     // 4. Renvoyer les tokens à l'utilisateur
     let bump = ctx.bumps.vault_authority;
     let signer_seeds = &[&b"vault_authority"[..], &[bump]];

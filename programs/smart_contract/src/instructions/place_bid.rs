@@ -75,11 +75,6 @@ pub fn handler(ctx: Context<PlaceBid>, slot_index: usize, amount: u64) -> Result
 
     // 2. Mettre à jour l'orderbook
     orderbook.slots[slot_index] = orderbook.slots[slot_index].checked_add(amount).unwrap();
-    
-    // Mettre à jour le meilleur tick si nécessaire
-    if slot_index as u64 > orderbook.best_idx {
-        orderbook.best_idx = slot_index as u64;
-    }
 
     // 3. Transférer les tokens vers le coffre-fort
     let cpi_accounts = TransferChecked {
