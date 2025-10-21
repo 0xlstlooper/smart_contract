@@ -81,13 +81,26 @@ impl AllAssets {
 
     // Takes a parameter amount in SOL to split on the orderbook by selecting the best APY available iteratively
     // Example: if the orderbook has 500 at 120% and 300 at 130%, and we want to split 600,
-    //  we will take 500 at 120% and 100 at 130%
+    //   we will take 500 at 120% and 100 at 130%
     // Need to return an array of (tick_index, amount), which represents for each assets
-    //  upon which tick we selected their liquidity, and what amount we took from it
+    //   upon which tick we selected their liquidity, and what amount we took from it
     // So: the sum all amounts must be equal to the input amount
-    // Must be a vector of size allassets.size_assets
+    // Result is a vector of size allassets.size_assets
     pub fn split_lenders_sol(&self, amount: u64) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+        Ok(result)
+    }
+
+    /*
+    Start_amount is the amount of SOL already splitted, and then delta is the change (+ or -)
+    We return what changes needs to be applied to each asset's split,
+    aka changes that needs to be done by the smart contract in deposit/withdraw function so the resulting split is correct after a deposit/withdraw
+    Essentially, split_lenders_sol(start_amount + delta) = split_lenders_sol(start_amount) + delta_split_sol(start_amount, delta)
+    So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
+    */
+    // Result is a vector of size allassets.size_assets
+    pub fn delta_split_sol(&self, start_amount: u64, delta: i64) -> Result<Vec<(u64, i64)>> {
+        let mut result: Vec<(u64, i64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }
 }

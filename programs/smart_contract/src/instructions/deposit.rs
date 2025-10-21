@@ -4,6 +4,8 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 
+// Todo - selectionner le bon asset à deposer
+
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]

@@ -4,6 +4,8 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 
+// Todo - selectionner l'asset qu'on redonne à l'utilisateur
+
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
     #[account(mut)]
