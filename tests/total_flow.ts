@@ -220,19 +220,24 @@ describe("test place bid", () => {
 
     console.log(`Initial user balance: ${initialUserBalance}`);
     console.log(`Initial vault balance: ${initialVaultBalance}`);
-
-    // --- Deposit Asset 1 ---
-    await program.methods.deposit(depositAmount).accounts({
-        payer: payer.publicKey,
-        sourceAccount: sourceAccount,
-        vaultAsset: vaultAssetPda1,
-        mintAsset: mintAsset1,
-        vaultAuthority: vaultAuthorityPda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-    }).rpc();
     
+    await program.methods
+      .deposit([depositAmount]) // Argument is now an array
+      .accounts({
+          // Accounts from the DepositMultiple struct
+          payer: payer.publicKey,
+          vaultAuthority: vaultAuthorityPda,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .remainingAccounts([
+          // Accounts are passed here in order: [source, vault, mint]
+          { pubkey: sourceAccount, isSigner: false, isWritable: true },
+          { pubkey: vaultAssetPda1, isSigner: false, isWritable: true },
+          { pubkey: mintAsset1, isSigner: false, isWritable: false },
+      ])
+      .rpc();
     console.log("\n--- After Deposit ---");
 
     let userBalanceAfterDeposit = (await getAccount(provider.connection, sourceAccount)).amount;

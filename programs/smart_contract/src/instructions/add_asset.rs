@@ -53,7 +53,7 @@ pub struct AddAsset<'info> {
 
 pub fn handler(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
     let idx = ctx.accounts.allassets.size_assets;
-    require!(idx < MAX_ASSETS, ErrorCode::AllAsssetsIsFull);
+    require!(idx < MAX_ASSETS, ErrorCode::AllAssetsIsFull);
     ctx.accounts.allassets.size_assets += 1;
     let allassets = &mut ctx.accounts.allassets.assets;
     let asset = &mut allassets[idx as usize];

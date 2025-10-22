@@ -86,6 +86,7 @@ impl AllAssets {
     //   upon which tick we selected their liquidity, and what amount we took from it
     // So: the sum all amounts must be equal to the input amount
     // Result is a vector of size allassets.size_assets
+    // @Audrey
     pub fn split_lenders_sol(&self, amount: u64) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
@@ -99,6 +100,7 @@ impl AllAssets {
     So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
     */
     // Result is a vector of size allassets.size_assets
+    // @Audrey
     pub fn delta_split_sol(&self, start_amount: u64, delta: i64) -> Result<Vec<(u64, i64)>> {
         let mut result: Vec<(u64, i64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
