@@ -2,10 +2,10 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_interface::{ Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
 
-use crate::state::{Config, Orderbook, AllAssets, MAX_ASSETS};
+use crate::state::{Orderbook, AllAssets, MAX_ASSETS};
 use crate::errors::ErrorCode;
 
-// Todo ajouter que le payer est forcement l'admin
+// Todo faire en sorte que le payer est forcement l'admin
 
 #[derive(Accounts)]
 pub struct AddAsset<'info> {
@@ -13,10 +13,10 @@ pub struct AddAsset<'info> {
     pub payer: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"allassets"],
+        seeds = [b"all_assets", all_assets.base_asset.key().as_ref()],
         bump,
     )]
-    pub allassets: Account<'info, AllAssets>,
+    pub all_assets: Account<'info, AllAssets>,
     // Vault authority
     #[account(
         seeds = [b"vault_authority"],
@@ -52,11 +52,11 @@ pub struct AddAsset<'info> {
 }
 
 pub fn handler(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
-    let idx = ctx.accounts.allassets.size_assets;
+    let idx = ctx.accounts.all_assets.size_assets;
     require!(idx < MAX_ASSETS, ErrorCode::AllAssetsIsFull);
-    ctx.accounts.allassets.size_assets += 1;
-    let allassets = &mut ctx.accounts.allassets.assets;
-    let asset = &mut allassets[idx as usize];
+    ctx.accounts.all_assets.size_assets += 1;
+    let all_assets = &mut ctx.accounts.all_assets.assets;
+    let asset = &mut all_assets[idx as usize];
     // Verify asset is not initialized yet
     require!(asset.multiplier == 0, ErrorCode::AssetAlreadyInitialized);
     asset.mint = ctx.accounts.mint_asset.key();

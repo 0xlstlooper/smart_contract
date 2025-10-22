@@ -55,7 +55,7 @@
 //       program.programId
 //     );
 //     [allAssets] = PublicKey.findProgramAddressSync(
-//       [Buffer.from("allassets")],
+//       [Buffer.from("all_assets")],
 //       program.programId
 //     );
 //     [vaultAuthority] = PublicKey.findProgramAddressSync(
@@ -120,7 +120,7 @@
 //       .accounts({
 //         payer: payer.publicKey,
 //         config: config,
-//         allassets: allAssets,
+//         all_assets: allAssets,
 //         tokenProgram: TOKEN_PROGRAM_ID,
 //         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
 //         systemProgram: SystemProgram.programId,
@@ -133,7 +133,7 @@
 //       .addAsset(multiplier1)
 //       .accounts({
 //         payer: payer.publicKey,
-//         allassets: allAssets,
+//         all_assets: allAssets,
 //         vaultAuthority: vaultAuthority,
 //         mintAsset: mintAsset1.publicKey,
 //         vaultAsset: vaultAsset1,
@@ -153,7 +153,7 @@
 //       .addAsset(multiplier2)
 //       .accounts({
 //         payer: payer.publicKey,
-//         allassets: allAssets,
+//         all_assets: allAssets,
 //         vaultAuthority: vaultAuthority,
 //         mintAsset: mintAsset2.publicKey,
 //         vaultAsset: vaultAsset2,

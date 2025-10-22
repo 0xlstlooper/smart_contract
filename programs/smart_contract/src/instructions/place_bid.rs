@@ -12,7 +12,7 @@ use crate::errors::ErrorCode;
 pub struct PlaceBid<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub allassets: Account<'info, AllAssets>,
+    pub all_assets: Account<'info, AllAssets>,
     #[account(
         mut,
         seeds = [b"orderbook", mint_asset.key().as_ref()],
@@ -63,14 +63,14 @@ pub struct PlaceBid<'info> {
 
 pub fn handler(ctx: Context<PlaceBid>, slot_index: usize, amount: u64) -> Result<()> {
     // 1. Calculer l'index du slot à partir du tick
-    let allassets = &ctx.accounts.allassets;
+    let all_assets = &ctx.accounts.all_assets;
     let orderbook = &mut ctx.accounts.orderbook;
 
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex);
-    // require!(tick >= allassets.start_tick, ErrorCode::TickTooLow);
-    // require!(tick <= allassets.start_tick + allassets.tick_size * (ORDERBOOK_SIZE as u64 - 1), ErrorCode::TickTooHigh);
-    // require!(tick % allassets.tick_size == 0, ErrorCode::TickNotAligned);
-    // let slot_index = ((tick - allassets.start_tick) / allassets.tick_size) as usize;
+    // require!(tick >= all_assets.start_tick, ErrorCode::TickTooLow);
+    // require!(tick <= all_assets.start_tick + all_assets.tick_size * (ORDERBOOK_SIZE as u64 - 1), ErrorCode::TickTooHigh);
+    // require!(tick % all_assets.tick_size == 0, ErrorCode::TickNotAligned);
+    // let slot_index = ((tick - all_assets.start_tick) / all_assets.tick_size) as usize;
     // require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex); // Shouldn't happen
 
     // 2. Mettre à jour l'orderbook

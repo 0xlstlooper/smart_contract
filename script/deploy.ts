@@ -19,7 +19,7 @@ describe("smart_contract", () => {
     );
 
     const [allAssetsPda] = await anchor.web3.PublicKey.findProgramAddress(
-      [Buffer.from("allassets")],
+      [Buffer.from("all_assets")],
       program.programId
     );
 
@@ -28,7 +28,7 @@ describe("smart_contract", () => {
       .accounts({
         payer: payer,
         config: configPda,
-        allassets: allAssetsPda,
+        all_assets: allAssetsPda,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         associatedTokenProgram: anchor.utils.token.ASSOCIATED_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,

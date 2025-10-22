@@ -11,7 +11,7 @@ use crate::errors::ErrorCode;
 pub struct RemoveBid<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub allassets: Account<'info, AllAssets>,
+    pub all_assets: Account<'info, AllAssets>,
     #[account(
         mut,
         seeds = [b"orderbook", mint_asset.key().as_ref()],
@@ -67,7 +67,7 @@ pub fn handler(ctx: Context<RemoveBid>) -> Result<()> {
     let amount = lender_deposit.amount;
 
     // 2. Calculer l'index du slot
-    let allassets = &ctx.accounts.allassets;
+    let all_assets = &ctx.accounts.all_assets;
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex);
 
     // 3. Mettre à jour l'orderbook

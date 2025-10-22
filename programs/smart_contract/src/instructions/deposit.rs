@@ -4,14 +4,21 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 use crate::errors::ErrorCode;
+use crate::state::{AllAssets};
 
 // Todo, check that the assets deposited are the one excepted from the datastructure
 
-// The Accounts struct remains the same
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"all_assets", all_assets.base_asset.key().as_ref()],
+        bump,
+    )]
+    pub all_assets: Account<'info, AllAssets>,
 
     #[account(
         seeds = [b"vault_authority"],
@@ -35,6 +42,9 @@ pub fn handler<'info>(
 
     // Ensure the number of amounts matches the number of asset triplets
     require!(amounts.len() == account_triplets.len(), ErrorCode::InvalidInputLength);
+
+    // The amounts we are supposed to deposit for each asset
+    // let amounts = ctx.all_assets
 
     // Zip the amounts and account triplets together to process them in pairs
     for (amount, accounts) in amounts.iter().zip(account_triplets) {

@@ -25,6 +25,7 @@ pub struct AssetInfo {
 #[account]
 #[derive(InitSpace)]
 pub struct AllAssets {
+    pub base_asset: Pubkey, // Mint of the base asset - never used in the logic per se but just to have it recorded somewhere because of the PDA and we want to have one unique market per asset
     pub size_assets: u64,
     pub assets: [AssetInfo; MAX_ASSETS as usize], // Array filled only until size_assets - todo le transformer en vec
     // Information shared across all the orderbooks
@@ -85,7 +86,7 @@ impl AllAssets {
     // Need to return an array of (tick_index, amount), which represents for each assets
     //   upon which tick we selected their liquidity, and what amount we took from it
     // So: the sum all amounts must be equal to the input amount
-    // Result is a vector of size allassets.size_assets
+    // Result is a vector of size all_assets.size_assets
     // @Audrey
     pub fn split_lenders_sol(&self, amount: u64) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
@@ -99,7 +100,8 @@ impl AllAssets {
     Essentially, split_lenders_sol(start_amount + delta) = split_lenders_sol(start_amount) + delta_split_sol(start_amount, delta)
     So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
     */
-    // Result is a vector of size allassets.size_assets
+    // One of the properties, due to the structure: if delta < 0, then all returned i64 are <= 0, and if delta > 0, then all returned i64 are >= 0
+    // Result is a vector of size all_assets.size_assets
     // @Audrey
     pub fn delta_split_sol(&self, start_amount: u64, delta: i64) -> Result<Vec<(u64, i64)>> {
         let mut result: Vec<(u64, i64)> = vec![(0, 0); self.size_assets as usize];
@@ -114,6 +116,7 @@ mod tests {
     // Just return a default AllAssets for testing
     fn create_default_all_assets() -> AllAssets {
         AllAssets {
+            base_asset: Pubkey::default(),
             assets: [
                 AssetInfo {
                     mint: Pubkey::default(),

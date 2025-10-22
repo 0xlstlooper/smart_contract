@@ -25,6 +25,7 @@ describe("test place bid", () => {
   let mintAsset1: anchor.web3.PublicKey;
   let mintAsset2: anchor.web3.PublicKey;
   
+  let baseAsset: anchor.web3.PublicKey; // Base asset for the market we create in this test
   let allAssetsPda: anchor.web3.PublicKey;
   let configPda: anchor.web3.PublicKey;
   let vaultAuthorityPda: anchor.web3.PublicKey;
@@ -44,13 +45,18 @@ describe("test place bid", () => {
   let sourceAccount: anchor.web3.PublicKey;
 
   it("Is initialized!", async () => {
-    // Derive PDAs for initialization
-    [configPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("config")],
-      program.programId
+    baseAsset = await createMint(
+      provider.connection,
+      payer.payer,
+      payer.publicKey,
+      null,
+      1 // Decimals
     );
+    console.log("Created Base Asset Mint:", baseAsset.toBase58());
+
+    // Derive PDAs for initialization
     [allAssetsPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [Buffer.from("allassets")],
+      [Buffer.from("all_assets"), baseAsset.toBuffer()],
       program.programId
     );
 
@@ -59,8 +65,8 @@ describe("test place bid", () => {
       .initialize(startTick, tickSize)
       .accounts({
         payer: payer.publicKey,
-        config: configPda,
-        allassets: allAssetsPda,
+        baseAsset: baseAsset,
+        allAssets: allAssetsPda,
         tokenProgram: TOKEN_PROGRAM_ID,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
@@ -107,7 +113,7 @@ describe("test place bid", () => {
       .addAsset(multiplier)
       .accounts({
         payer: payer.publicKey,
-        allassets: allAssetsPda,
+        allAssets: allAssetsPda,
         vaultAuthority: vaultAuthorityPda,
         mintAsset: mintAsset1,
         vaultAsset: vaultAssetPda1,
@@ -154,7 +160,7 @@ describe("test place bid", () => {
       .addAsset(multiplier)
       .accounts({
         payer: payer.publicKey,
-        allassets: allAssetsPda,
+        allAssets: allAssetsPda,
         vaultAuthority: vaultAuthorityPda,
         mintAsset: mintAsset2,
         vaultAsset: vaultAssetPda2,
@@ -226,6 +232,7 @@ describe("test place bid", () => {
       .accounts({
           // Accounts from the DepositMultiple struct
           payer: payer.publicKey,
+          allAssets: allAssetsPda,
           vaultAuthority: vaultAuthorityPda,
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -299,7 +306,7 @@ describe("test place bid", () => {
       .placeBid(bidIndex, bidAmount)
       .accounts({
         payer: payer.publicKey,
-        allassets: allAssetsPda,
+        allAssets: allAssetsPda,
         orderbook: orderbookPda1,
         mintAsset: mintAsset1,
         lenderDeposit: lenderDepositPda,

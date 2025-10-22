@@ -5,12 +5,6 @@ pub use all_assets::*;
 
 #[account]
 #[derive(InitSpace)]
-pub struct Config {
-    pub admin: Pubkey,
-}
-
-#[account]
-#[derive(InitSpace)]
 pub struct LenderDeposit {
     pub lender: Pubkey,
     pub mint_asset: Pubkey,
