@@ -47,13 +47,12 @@ pub struct PlaceBid<'info> {
     )]
     pub vault_asset: InterfaceAccount<'info, TokenAccount>,
 
-    // Autorité du coffre-fort
+    /// CHECK: ok
     #[account(
         seeds = [b"vault_authority"],
         bump
     )]
-    /// CHECK: C'est juste un PDA, pas un compte de programme.
-    pub vault_authority: AccountInfo<'info>,
+    pub vault_authority: UncheckedAccount<'info>,
 
     // Programmes
     pub token_program: Interface<'info, TokenInterface>,

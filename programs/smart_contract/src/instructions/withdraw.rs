@@ -18,25 +18,24 @@ pub struct Withdraw<'info> {
     )]
     pub all_assets: Account<'info, AllAssets>,
 
-    /// CHECK: This is the vault authority PDA, its seeds are verified.
+    /// CHECK: ok
     #[account(
         seeds = [b"vault_authority"],
         bump
     )]
-    pub vault_authority: AccountInfo<'info>,
+    pub vault_authority: UncheckedAccount<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-// remaining_accounts: for each asset being withdrawn:
-// [destination_account, vault_asset, mint_asset]
+// Structure of remaining_accounts: for each asset being withdrawn: [destination_account, vault_asset, mint_asset]
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>,
     amount: u64
 ) -> Result<()> {
-    
+
     // Format of the structure: [destination_account, vault_asset, mint_asset]
     let account_triplets = ctx.remaining_accounts.chunks_exact(3);
 
