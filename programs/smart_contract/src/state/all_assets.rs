@@ -84,7 +84,7 @@ impl AllAssets {
         best_offer.ok_or_else(|| error!(ErrorCode::NoLiquidityAvailable))
     }
 
-    // Takes a parameter amount in SOL to split on the orderbook by selecting the best APY available iteratively
+    // Takes the amount from self.amount in SOL to split on the orderbook by selecting the best APY available iteratively
     // Example: if the orderbook has 500 at 120% and 300 at 130%, and we want to split 600,
     //   we will take 500 at 120% and 100 at 130%
     // Need to return an array of (tick_index, amount), which represents for each assets
@@ -92,23 +92,21 @@ impl AllAssets {
     // So: the sum all amounts must be equal to the input amount
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    pub fn split_lenders_sol(&self, amount: u64) -> Result<Vec<(u64, u64)>> {
+    pub fn split_lenders_sol(&self) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }
 
     /*
-    Start_amount is the amount of SOL already splitted, and then delta is the change (+ or -)
+    self.amount is the amount of SOL already splitted, and then delta is the change (+ or -)
     We return what changes needs to be applied to each asset's split,
     aka changes that needs to be done by the smart contract in deposit/withdraw function so the resulting split is correct after a deposit/withdraw
-    Essentially, split_lenders_sol(start_amount + delta) = split_lenders_sol(start_amount) + delta_split_sol(delta)
+    Essentially, split_lenders_sol(amount = start_amount + delta) = split_lenders_sol(amount = start_amount) + delta_split_sol(amount = start_amount, delta, true)
     So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
     */
-    // One of the properties, due to the structure: if delta < 0, then all returned i64 are <= 0, and if delta > 0, then all returned i64 are >= 0
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    // Todo update comment
-    pub fn delta_split_sol(&self, amount: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
+    pub fn delta_split_sol(&self, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }
@@ -171,13 +169,15 @@ mod tests {
         // Orderbook for asset0: [500, 400, 100, 0, 0, 0, 0, 0, 0, 0]
         // Aka, 500amount of liquidity at tick 0 (100%), 400 at tick 1 (110%), 100 at tick 2 (120%)
 
-        let result = all_assets.split_lenders_sol(600).unwrap();
+        all_assets.amount = 600;
+        let result = all_assets.split_lenders_sol().unwrap();
         // For asset0, we should take 500 from tick 0 and 100 from tick 1
         // so the result for asset0 is (1, 600)
         // For asset1, there is no liquidity, so (0, 0) - but it doesnt matter so if your implem returns smth else when the amount of liquidity is 0 its correct also and just change the test
         assert_eq!(result, vec![(1, 600), (0, 0)]);
 
-        let result = all_assets.split_lenders_sol(400).unwrap();
+        all_assets.amount = 400;
+        let result = all_assets.split_lenders_sol().unwrap();
         assert_eq!(result, vec![(1, 400), (0, 0)]);
 
         // Orderbook for asset1: [100, 100, 200, 300, 0, 0, 0, 0, 0, 0]
@@ -187,11 +187,13 @@ mod tests {
         all_assets.assets[1].orderbook.slots[3] = 300;
         // Aka, 100amount of liquidity at tick 0 (100%), 100 at tick 1 (110%), 200 at tick 2 (120%), 300 at tick 3 (130%)
 
-        let result = all_assets.split_lenders_sol(100).unwrap();
+        all_assets.amount = 100;
+        let result = all_assets.split_lenders_sol().unwrap();
         // The best APY is now from asset1 at tick 3, so we should take 100 from there
         assert_eq!(result, vec![(0, 0), (3, 100)]);
 
-        let result = all_assets.split_lenders_sol(600).unwrap();
+        all_assets.amount = 600;
+        let result = all_assets.split_lenders_sol().unwrap();
         // We should take 300 from tick 3 of asset1, we now have 300 left to split
         // The next best APY is tick 2 of asset1, so we take 200 from there, 100 left
         // The next best APY is tick 2 of asset0, so we take 100 from there, 0 left - done

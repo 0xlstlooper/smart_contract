@@ -32,8 +32,8 @@ pub mod smart_contract {
             (Although the frontend has a slippage parameter when doing the swaps to get the required tokens,
             but we use exact output, so the user will always get the exact amount of tokens needed for the deposit,
             even if what he pays will differ because of slippage)
+        // The amount parameter allows the code to compute how much of each asset to deposit
     */
-    // Todo update comment
     pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64) -> Result<()> {
         instructions::deposit::handler(ctx, amount)
     }
