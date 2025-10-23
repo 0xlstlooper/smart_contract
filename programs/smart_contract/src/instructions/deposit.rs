@@ -6,8 +6,6 @@ use anchor_spl::{
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets};
 
-// Todo, check that the assets deposited are the one excepted from the datastructure
-
 #[derive(Accounts)]
 pub struct Deposit<'info> {
     #[account(mut)]
@@ -20,11 +18,11 @@ pub struct Deposit<'info> {
     )]
     pub all_assets: Account<'info, AllAssets>,
 
+    /// CHECK: This is the vault authority PDA, its seeds are verified.
     #[account(
         seeds = [b"vault_authority"],
         bump
     )]
-    /// CHECK: This is the vault authority PDA, its seeds are verified.
     pub vault_authority: AccountInfo<'info>,
 
     pub token_program: Interface<'info, TokenInterface>,
@@ -32,28 +30,25 @@ pub struct Deposit<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// remaining_accounts: for each asset being deposited:
+// [source_account, vault_asset, mint_asset]
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
-    amounts: Vec<u64>
+    amount: u64
 ) -> Result<()> {
     
-    // Use chunks_exact to get account triplets. This is safer and cleaner.
+    // Format of the structure: [source_account, vault_asset, mint_asset]
     let account_triplets = ctx.remaining_accounts.chunks_exact(3);
 
-    // Ensure the number of amounts matches the number of asset triplets
-    require!(amounts.len() == account_triplets.len(), ErrorCode::InvalidInputLength);
+    // The amounts we are supposed to deposit for each asset. `true` for deposit.
+    let amounts = ctx.accounts.all_assets.delta_split_sol(amount, true)?;
 
-    // The amounts we are supposed to deposit for each asset
-    // let amounts = ctx.all_assets
-
-    // Zip the amounts and account triplets together to process them in pairs
     for (amount, accounts) in amounts.iter().zip(account_triplets) {
         // Unpack the accounts for this specific asset
         let source_account_info = &accounts[0];
         let vault_asset_info = &accounts[1];
         let mint_asset_info = &accounts[2];
 
-        // --- MANUAL VALIDATION ---
         let source_account = InterfaceAccount::<TokenAccount>::try_from(source_account_info)?;
         let vault_asset = InterfaceAccount::<TokenAccount>::try_from(vault_asset_info)?;
         let mint_asset = InterfaceAccount::<Mint>::try_from(mint_asset_info)?;
@@ -76,7 +71,7 @@ pub fn handler<'info>(
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
 
-        transfer_checked(cpi_ctx, *amount, mint_asset.decimals)?;
+        transfer_checked(cpi_ctx, amount.1, mint_asset.decimals)?;
     }
 
     Ok(())

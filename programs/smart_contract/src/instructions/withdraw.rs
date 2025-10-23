@@ -1,68 +1,83 @@
-use anchor_lang::prelude::*;
+use anchor_lang::{prelude::*, system_program};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
-
-// Todo - selectionner l'asset qu'on redonne à l'utilisateur
+use crate::errors::ErrorCode;
+use crate::state::{AllAssets};
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // The user's token account to receive the withdrawn asset
     #[account(
         mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = payer,
+        seeds = [b"all_assets", all_assets.base_asset.key().as_ref()],
+        bump,
     )]
-    pub destination_account: InterfaceAccount<'info, TokenAccount>,
-    
-    // The program's vault for the asset
-    #[account(
-        mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = vault_authority,
-    )]
-    pub vault_asset: InterfaceAccount<'info, TokenAccount>,
+    pub all_assets: Account<'info, AllAssets>,
 
-    // The mint of the asset
-    pub mint_asset: InterfaceAccount<'info, Mint>,
-
-    // The PDA authority for the vault
+    /// CHECK: This is the vault authority PDA, its seeds are verified.
     #[account(
         seeds = [b"vault_authority"],
         bump
     )]
-    /// CHECK: This is the vault authority PDA.
     pub vault_authority: AccountInfo<'info>,
 
-    // System Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+// remaining_accounts: for each asset being withdrawn:
+// [destination_account, vault_asset, mint_asset]
+pub fn handler<'info>(
+    ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>,
+    amount: u64
+) -> Result<()> {
+    
+    // Format of the structure: [destination_account, vault_asset, mint_asset]
+    let account_triplets = ctx.remaining_accounts.chunks_exact(3);
+
+    // The amounts we are supposed to withdraw for each asset. `false` for withdrawal.
+    let amounts = ctx.accounts.all_assets.delta_split_sol(amount, false)?;
+
     // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;
     let signer_seeds = &[&b"vault_authority"[..], &[bump]];
     let signer = &[&signer_seeds[..]];
 
-    // Create CPI accounts for the transfer
-    let cpi_accounts = TransferChecked {
-        from: ctx.accounts.vault_asset.to_account_info(),
-        mint: ctx.accounts.mint_asset.to_account_info(),
-        to: ctx.accounts.destination_account.to_account_info(),
-        authority: ctx.accounts.vault_authority.to_account_info(),
-    };
-    
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-    
-    // Transfer tokens from the vault back to the user.
-    transfer_checked(cpi_ctx, amount, ctx.accounts.mint_asset.decimals)?;
+    for (amount, accounts) in amounts.iter().zip(account_triplets) {
+        // Unpack the accounts for this specific asset
+        let destination_account_info = &accounts[0];
+        let vault_asset_info = &accounts[1];
+        let mint_asset_info = &accounts[2];
+
+        let destination_account = InterfaceAccount::<TokenAccount>::try_from(destination_account_info)?;
+        let vault_asset = InterfaceAccount::<TokenAccount>::try_from(vault_asset_info)?;
+        let mint_asset = InterfaceAccount::<Mint>::try_from(mint_asset_info)?;
+
+        // Check mint correspondence
+        require_keys_eq!(destination_account.mint, mint_asset.key(), ErrorCode::MintMismatch);
+        require_keys_eq!(vault_asset.mint, mint_asset.key(), ErrorCode::MintMismatch);
+
+        // Check ownership and authority
+        require_keys_eq!(destination_account.owner, ctx.accounts.payer.key(), ErrorCode::OwnerMismatch);
+        require_keys_eq!(vault_asset.owner, ctx.accounts.vault_authority.key(), ErrorCode::VaultOwnerMismatch);
+
+        // --- CPI Call ---
+        let cpi_accounts = TransferChecked {
+            from: vault_asset_info.clone(),
+            mint: mint_asset_info.clone(),
+            to: destination_account_info.clone(),
+            authority: ctx.accounts.vault_authority.to_account_info(),
+        };
+        let cpi_program = ctx.accounts.token_program.to_account_info();
+        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
+
+        transfer_checked(cpi_ctx, amount.1, mint_asset.decimals)?;
+    }
 
     Ok(())
 }

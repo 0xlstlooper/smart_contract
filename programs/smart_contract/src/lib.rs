@@ -33,11 +33,12 @@ pub mod smart_contract {
             but we use exact output, so the user will always get the exact amount of tokens needed for the deposit,
             even if what he pays will differ because of slippage)
     */
-    pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amounts: Vec<u64>) -> Result<()> {
-        instructions::deposit::handler(ctx, amounts)
+    // Todo update comment
+    pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64) -> Result<()> {
+        instructions::deposit::handler(ctx, amount)
     }
     // -- A lender function
-    pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
+    pub fn withdraw<'info>(ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>, amount: u64) -> Result<()> {
         instructions::withdraw::handler(ctx, amount)
     }
     // Loopers' section

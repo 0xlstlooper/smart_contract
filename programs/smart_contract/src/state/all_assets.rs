@@ -25,12 +25,16 @@ pub struct AssetInfo {
 #[account]
 #[derive(InitSpace)]
 pub struct AllAssets {
+    // Identifier of the market
     pub base_asset: Pubkey, // Mint of the base asset - never used in the logic per se but just to have it recorded somewhere because of the PDA and we want to have one unique market per asset
+    // List of all assets
     pub size_assets: u64,
     pub assets: [AssetInfo; MAX_ASSETS as usize], // Array filled only until size_assets - todo le transformer en vec
     // Information shared across all the orderbooks
     pub start_tick: u64,
     pub tick_size: u64,
+    // Total amount of SOL deposited by lenders in this market
+    pub amount: u64,
 }
 
 /* Invariant of the structure:
@@ -97,14 +101,15 @@ impl AllAssets {
     Start_amount is the amount of SOL already splitted, and then delta is the change (+ or -)
     We return what changes needs to be applied to each asset's split,
     aka changes that needs to be done by the smart contract in deposit/withdraw function so the resulting split is correct after a deposit/withdraw
-    Essentially, split_lenders_sol(start_amount + delta) = split_lenders_sol(start_amount) + delta_split_sol(start_amount, delta)
+    Essentially, split_lenders_sol(start_amount + delta) = split_lenders_sol(start_amount) + delta_split_sol(delta)
     So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
     */
     // One of the properties, due to the structure: if delta < 0, then all returned i64 are <= 0, and if delta > 0, then all returned i64 are >= 0
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    pub fn delta_split_sol(&self, start_amount: u64, delta: i64) -> Result<Vec<(u64, i64)>> {
-        let mut result: Vec<(u64, i64)> = vec![(0, 0); self.size_assets as usize];
+    // Todo update comment
+    pub fn delta_split_sol(&self, amount: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
+        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }
 }
@@ -138,6 +143,7 @@ mod tests {
             size_assets: 2, // 2 because we have 2 assets listed in this structure
             start_tick: 100,
             tick_size: 10,
+            amount: 0,
         }
     }
 
