@@ -40,11 +40,12 @@ pub fn handler<'info>(
 
     // The amounts we are supposed to deposit for each asset. `true` for deposit.
     let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, true)?;
-    let (amounts, mints) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    require!(withdraw_amounts.len() == 0, ErrorCode::ShouldBeNoWithdrawAmounts);
 
     manage_deposit(
-        &amounts,
-        &mints,
+        &deposit_amounts,
+        &deposit_mints,
         &ctx.remaining_accounts,
         &ctx.accounts.payer,
         &ctx.accounts.vault_authority,

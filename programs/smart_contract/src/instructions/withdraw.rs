@@ -39,7 +39,8 @@ pub fn handler<'info>(
 
     // The amounts we are supposed to withdraw for each asset. `false` for withdrawal.
     let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, false)?;
-    let (amounts, mints) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    require!(deposit_amounts.len() == 0, ErrorCode::ShouldBeNoDepositAmounts);
     
     // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;
@@ -47,8 +48,8 @@ pub fn handler<'info>(
     let signer = &[&signer_seeds[..]];
 
     manage_withdraw(
-        &amounts,
-        &mints,
+        &withdraw_amounts,
+        &withdraw_mints,
         &ctx.remaining_accounts,
         &ctx.accounts.payer,
         &ctx.accounts.vault_authority,

@@ -30,4 +30,9 @@ pub enum ErrorCode {
     InvalidTickIndex,
     #[msg("Only the original lender can remove their bid.")]
     OnlyOriginalLender,
+    // Error in the datastructure itself (break of invariant)
+    #[msg("Data structure invariant broken: there should be no deposit amounts in a withdraw request.")]
+    ShouldBeNoDepositAmounts,
+    #[msg("Data structure invariant broken: there should be no withdraw amounts in a deposit request.")]
+    ShouldBeNoWithdrawAmounts,
 }

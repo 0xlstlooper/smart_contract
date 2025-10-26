@@ -7,12 +7,26 @@ use crate::errors::ErrorCode;
 use crate::state::AllAssets;
 
 pub fn delta_split_extraction(
-    delta_split: &Vec<(u64, u64)>,
+    delta_split: &Vec<(u64, i128)>,
     all_assets: &Account<AllAssets>,
-) -> (Vec<u64>, Vec<Pubkey>) {
-    let amounts: Vec<u64> = delta_split.iter().map(|(tick_index, amt)| *amt).collect();
-    let mints: Vec<Pubkey> = delta_split.iter().enumerate().map(|(i, _)| all_assets.assets[i].mint).collect();
-    (amounts, mints)
+) -> ((Vec<u64>, Vec<Pubkey>), (Vec<u64>, Vec<Pubkey>)) {
+    // Split into deposits and withdrawals
+    let mut deposit_amounts: Vec<u64> = vec![];
+    let mut deposit_mints: Vec<Pubkey> = vec![];
+    let mut withdraw_amounts: Vec<u64> = vec![];
+    let mut withdraw_mints: Vec<Pubkey> = vec![];
+    for i in 0..all_assets.size_assets as usize {
+        let (tick_index, amount_change) = delta_split[i];
+        let mint = all_assets.assets[i].mint;
+        if amount_change > 0 {
+            deposit_amounts.push(amount_change as u64);
+            deposit_mints.push(mint);
+        } else if amount_change < 0 {
+            withdraw_amounts.push((-amount_change) as u64);
+            withdraw_mints.push(mint);
+        }
+    }
+    ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints))
 }
 
 pub fn manage_deposit<'info>(

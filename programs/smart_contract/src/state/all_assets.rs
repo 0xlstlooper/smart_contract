@@ -108,8 +108,9 @@ impl AllAssets {
     */
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    pub fn delta_split_lender(&self, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
-        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+    pub fn delta_split_lender(&self, delta: u64, sign: bool) -> Result<Vec<(u64, i128)>> {
+        let value = if sign { 1 as i128 } else { -1 as i128 }; // Example value (because with 0 it fails some other checks elsewhere)
+        let mut result: Vec<(u64, i128)> = vec![(0, value); self.size_assets as usize];
         Ok(result)
     }
 
