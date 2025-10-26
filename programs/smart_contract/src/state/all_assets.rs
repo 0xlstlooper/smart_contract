@@ -84,6 +84,7 @@ impl AllAssets {
         best_offer.ok_or_else(|| error!(ErrorCode::NoLiquidityAvailable))
     }
 
+    // Useless in itself in the code, only delta_split_* are used
     // Takes the amount from self.amount in SOL to split on the orderbook by selecting the best APY available iteratively
     // Example: if the orderbook has 500 at 120% and 300 at 130%, and we want to split 600,
     //   we will take 500 at 120% and 100 at 130%
@@ -101,12 +102,21 @@ impl AllAssets {
     self.amount is the amount of SOL already splitted, and then delta is the change (+ or -)
     We return what changes needs to be applied to each asset's split,
     aka changes that needs to be done by the smart contract in deposit/withdraw function so the resulting split is correct after a deposit/withdraw
-    Essentially, split_lenders_sol(amount = start_amount + delta) = split_lenders_sol(amount = start_amount) + delta_split_sol(amount = start_amount, delta, true)
-    So after a deposit/withdraw, we apply the changes returned by delta_split_sol to the current split to get the new split
+    Essentially, split_lenders_sol(amount = start_amount + delta) = split_lenders_sol(amount = start_amount) + delta_split_lender(amount = start_amount, delta, true)
+    So after a deposit/withdraw, we apply the changes returned by delta_split_lender to the current split to get the new split
+    result[i] = (tick_index, amount) for asset i
     */
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    pub fn delta_split_sol(&self, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
+    pub fn delta_split_lender(&self, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
+        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+        Ok(result)
+    }
+
+    /* Basically, same as above, but for loopers
+    Whats the new repartition once we apply a change of `delta` to asset of index `index`, at slot `slot`
+    */
+    pub fn delta_split_looper(&self, index: u64, slot: u64, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
         let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }

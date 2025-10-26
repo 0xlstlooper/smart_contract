@@ -1,5 +1,7 @@
 use anchor_lang::prelude::*;
 
+// Todo group these errors codes together
+
 #[error_code]
 pub enum ErrorCode {
     // Deposit

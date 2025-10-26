@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 mod errors;
 mod instructions;
 mod state;
+mod manage_transfer;
 
 use instructions::*;
 
@@ -21,7 +22,6 @@ pub mod smart_contract {
         instructions::add_asset::handler(ctx, multiplier)
     }
     // Lenders' section
-    // -- A lender function
     /*
         Flow of use:
         + The frontend of the lender checks which tokenS and amounts of them he is supposed to deposit
@@ -37,12 +37,15 @@ pub mod smart_contract {
     pub fn deposit<'info>(ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, amount: u64) -> Result<()> {
         instructions::deposit::handler(ctx, amount)
     }
-    // -- A lender function
+    // Same - when frontrunned, the user will get a different split of tokens
     pub fn withdraw<'info>(ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>, amount: u64) -> Result<()> {
         instructions::withdraw::handler(ctx, amount)
     }
     // Loopers' section
-    // -- A looper function
+    /*
+        Flow of use: -- todo factoriser les transfers dans une autre fonction pcq ces fonctions font ça aussi
+
+    */
     pub fn place_bid(ctx: Context<PlaceBid>, slot_index: u64, amount: u64) -> Result<()> {
         instructions::place_bid::handler(ctx, slot_index as usize, amount)
     }

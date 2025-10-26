@@ -5,6 +5,7 @@ use anchor_spl::{
 };
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets};
+use crate::manage_transfer::*;
 
 #[derive(Accounts)]
 pub struct Deposit<'info> {
@@ -30,48 +31,25 @@ pub struct Deposit<'info> {
     pub system_program: Program<'info, System>,
 }
 
+// Todo refactoriser pour plus prendre en argument les mints
 // Structure of remaining_accounts: for each asset being deposited: [source_account, vault_asset, mint_asset]
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
     amount: u64
 ) -> Result<()> {
-    
-    // Format of the structure: [source_account, vault_asset, mint_asset]
-    let account_triplets = ctx.remaining_accounts.chunks_exact(3);
 
     // The amounts we are supposed to deposit for each asset. `true` for deposit.
-    let amounts = ctx.accounts.all_assets.delta_split_sol(amount, true)?;
+    let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, true)?;
+    let (amounts, mints) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
 
-    for (amount, accounts) in amounts.iter().zip(account_triplets) {
-        // Unpack the accounts for this specific asset
-        let source_account_info = &accounts[0];
-        let vault_asset_info = &accounts[1];
-        let mint_asset_info = &accounts[2];
-
-        let source_account = InterfaceAccount::<TokenAccount>::try_from(source_account_info)?;
-        let vault_asset = InterfaceAccount::<TokenAccount>::try_from(vault_asset_info)?;
-        let mint_asset = InterfaceAccount::<Mint>::try_from(mint_asset_info)?;
-
-        // Check mint correspondence
-        require_keys_eq!(source_account.mint, mint_asset.key(), ErrorCode::MintMismatch);
-        require_keys_eq!(vault_asset.mint, mint_asset.key(), ErrorCode::MintMismatch);
-
-        // Check ownership and authority
-        require_keys_eq!(source_account.owner, ctx.accounts.payer.key(), ErrorCode::OwnerMismatch);
-        require_keys_eq!(vault_asset.owner, ctx.accounts.vault_authority.key(), ErrorCode::VaultOwnerMismatch);
-
-        // --- CPI Call ---
-        let cpi_accounts = TransferChecked {
-            from: source_account_info.clone(),
-            mint: mint_asset_info.clone(),
-            to: vault_asset_info.clone(),
-            authority: ctx.accounts.payer.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-        transfer_checked(cpi_ctx, amount.1, mint_asset.decimals)?;
-    }
+    manage_deposit(
+        &amounts,
+        &mints,
+        &ctx.remaining_accounts,
+        &ctx.accounts.payer,
+        &ctx.accounts.vault_authority,
+        &mut ctx.accounts.token_program,
+    )?;
 
     Ok(())
 }

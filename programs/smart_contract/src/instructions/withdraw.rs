@@ -1,10 +1,11 @@
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets};
+use crate::manage_transfer::*;
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
@@ -18,7 +19,7 @@ pub struct Withdraw<'info> {
     )]
     pub all_assets: Account<'info, AllAssets>,
 
-    /// CHECK: ok
+    /// CHECK: This is the vault's authority, a PDA. Its seeds are verified in the transfer.
     #[account(
         seeds = [b"vault_authority"],
         bump
@@ -36,47 +37,24 @@ pub fn handler<'info>(
     amount: u64
 ) -> Result<()> {
 
-    // Format of the structure: [destination_account, vault_asset, mint_asset]
-    let account_triplets = ctx.remaining_accounts.chunks_exact(3);
-
     // The amounts we are supposed to withdraw for each asset. `false` for withdrawal.
-    let amounts = ctx.accounts.all_assets.delta_split_sol(amount, false)?;
-
+    let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, false)?;
+    let (amounts, mints) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    
     // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;
     let signer_seeds = &[&b"vault_authority"[..], &[bump]];
     let signer = &[&signer_seeds[..]];
 
-    for (amount, accounts) in amounts.iter().zip(account_triplets) {
-        // Unpack the accounts for this specific asset
-        let destination_account_info = &accounts[0];
-        let vault_asset_info = &accounts[1];
-        let mint_asset_info = &accounts[2];
-
-        let destination_account = InterfaceAccount::<TokenAccount>::try_from(destination_account_info)?;
-        let vault_asset = InterfaceAccount::<TokenAccount>::try_from(vault_asset_info)?;
-        let mint_asset = InterfaceAccount::<Mint>::try_from(mint_asset_info)?;
-
-        // Check mint correspondence
-        require_keys_eq!(destination_account.mint, mint_asset.key(), ErrorCode::MintMismatch);
-        require_keys_eq!(vault_asset.mint, mint_asset.key(), ErrorCode::MintMismatch);
-
-        // Check ownership and authority
-        require_keys_eq!(destination_account.owner, ctx.accounts.payer.key(), ErrorCode::OwnerMismatch);
-        require_keys_eq!(vault_asset.owner, ctx.accounts.vault_authority.key(), ErrorCode::VaultOwnerMismatch);
-
-        // --- CPI Call ---
-        let cpi_accounts = TransferChecked {
-            from: vault_asset_info.clone(),
-            mint: mint_asset_info.clone(),
-            to: destination_account_info.clone(),
-            authority: ctx.accounts.vault_authority.to_account_info(),
-        };
-        let cpi_program = ctx.accounts.token_program.to_account_info();
-        let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-
-        transfer_checked(cpi_ctx, amount.1, mint_asset.decimals)?;
-    }
+    manage_withdraw(
+        &amounts,
+        &mints,
+        &ctx.remaining_accounts,
+        &ctx.accounts.payer,
+        &ctx.accounts.vault_authority,
+        &mut ctx.accounts.token_program,
+        signer,
+    )?;
 
     Ok(())
 }
