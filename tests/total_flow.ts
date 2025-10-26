@@ -218,7 +218,14 @@ describe("test place bid", () => {
     );
     console.log(`Minted ${mintAmount} tokens of Asset 1 to my acc.`);
 
-    
+    // PDA for the deposit
+    const [lenderDepositPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("lender_deposit"),
+        payer.publicKey.toBuffer(),
+      ],
+      program.programId
+    );
 
     // Ensure the user has enough tokens to deposit (they were minted in the previous test)
     const initialUserBalance = (await getAccount(provider.connection, sourceAccount)).amount;
@@ -233,6 +240,7 @@ describe("test place bid", () => {
           // Accounts from the DepositMultiple struct
           payer: payer.publicKey,
           allAssets: allAssetsPda,
+          lenderDeposit: lenderDepositPda,
           vaultAuthority: vaultAuthorityPda,
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -259,7 +267,7 @@ describe("test place bid", () => {
     // assert.strictEqual(vaultBalanceAfterDeposit.toString(), new anchor.BN(initialVaultBalance.toString()).add(depositAmount).toString(), "Vault balance should increase after deposit");
 
     // --- Withdraw Asset 1 ---
-    const withdrawAmount = new anchor.BN(50 * 10 ** 6); // Withdraw half of the deposited amount
+    const withdrawAmount = new anchor.BN(50 * 10 ** 6); // Half of the deposited amount
 
     await program.methods
       .withdraw(withdrawAmount) // The total amount to withdraw
@@ -267,6 +275,7 @@ describe("test place bid", () => {
           // Accounts from the Withdraw struct
           payer: payer.publicKey,
           allAssets: allAssetsPda,
+          lenderDeposit: lenderDepositPda,
           vaultAuthority: vaultAuthorityPda,
           tokenProgram: TOKEN_PROGRAM_ID,
           associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
@@ -301,9 +310,9 @@ describe("test place bid", () => {
     const bidAmount = new anchor.BN(100 * 10 ** 6); // Bid 100 tokens
 
     // Derive PDA for the lender's deposit "ticket"
-    const [lenderDepositPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    const [looperDepositPda] = anchor.web3.PublicKey.findProgramAddressSync(
       [
-        Buffer.from("lender_deposit"),
+        Buffer.from("looper_deposit"),
         payer.publicKey.toBuffer(),
         mintAsset1.toBuffer(),
         bidIndex.toBuffer("le", 8), // tick must be little-endian 8 bytes
@@ -319,7 +328,7 @@ describe("test place bid", () => {
         allAssets: allAssetsPda,
         orderbook: orderbookPda1,
         mintAsset: mintAsset1,
-        lenderDeposit: lenderDepositPda,
+        looperDeposit: looperDepositPda,
         sourceAccount: sourceAccount,
         vaultAsset: vaultAssetPda1,
         vaultAuthority: vaultAuthorityPda,
@@ -337,10 +346,10 @@ describe("test place bid", () => {
 
     assert.ok(orderbookAccount.slots[slotIndex].eq(bidAmount), "Orderbook slot should be updated with the bid amount");
 
-    const lenderDepositAccount = await program.account.lenderDeposit.fetch(lenderDepositPda);
-    assert.ok(lenderDepositAccount.lender.equals(payer.publicKey), "Lender should be the payer");
-    assert.ok(lenderDepositAccount.amount.eq(bidAmount), "Lender deposit amount should match bid amount");
-    assert.ok(lenderDepositAccount.slotIndex.eq(bidIndex), "Lender deposit slot index should match bid slot index");
+    const looperDepositAccount = await program.account.looperDeposit.fetch(looperDepositPda);
+    assert.ok(looperDepositAccount.lender.equals(payer.publicKey), "Lender should be the payer");
+    assert.ok(looperDepositAccount.amount.eq(bidAmount), "Lender deposit amount should match bid amount");
+    assert.ok(looperDepositAccount.slotIndex.eq(bidIndex), "Lender deposit slot index should match bid slot index");
     console.log("Orderbook Account:", orderbookAccount);
   });
 

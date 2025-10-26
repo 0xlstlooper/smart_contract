@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 
-use crate::state::{AllAssets, LenderDeposit, Orderbook, ORDERBOOK_SIZE};
+use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::errors::ErrorCode;
 
 #[derive(Accounts)]
@@ -28,7 +28,7 @@ pub struct RemoveBid<'info> {
         bump = lender_deposit.bump,
         constraint = payer.key() == lender_deposit.lender @ ErrorCode::OnlyOriginalLender,
     )]
-    pub lender_deposit: Account<'info, LenderDeposit>,
+    pub lender_deposit: Account<'info, LooperDeposit>,
 
     // Compte de tokens de l'utilisateur pour l'actif
     #[account(

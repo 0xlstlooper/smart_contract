@@ -4,10 +4,11 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
 use crate::errors::ErrorCode;
-use crate::state::{AllAssets};
+use crate::state::{AllAssets, LenderDeposit};
 use crate::manage_transfer::*;
 
 #[derive(Accounts)]
+#[instruction(amount: u64)]
 pub struct Withdraw<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -18,6 +19,14 @@ pub struct Withdraw<'info> {
         bump,
     )]
     pub all_assets: Account<'info, AllAssets>,
+
+    #[account(
+        mut,
+        seeds = [b"lender_deposit", payer.key().as_ref()],
+        bump,
+        constraint = payer.key() == lender_deposit.lender @ ErrorCode::OnlyOriginalLender,
+    )]
+    pub lender_deposit: Account<'info, LenderDeposit>,
 
     /// CHECK: This is the vault's authority, a PDA. Its seeds are verified in the transfer.
     #[account(
@@ -56,6 +65,19 @@ pub fn handler<'info>(
         &mut ctx.accounts.token_program,
         signer,
     )?;
+
+    let lender_deposit = &mut ctx.accounts.lender_deposit;
+    lender_deposit.amount = lender_deposit.amount.checked_sub(amount).ok_or(ErrorCode::InsufficientVaultFunds)?;
+    // Todo les autres params
+
+    // Close the lender_deposit account if amount is zero
+    if lender_deposit.amount == 0 {
+        lender_deposit.close(ctx.accounts.payer.to_account_info())?;
+    }
+
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
+    // todo la c'est amount mais scaled avec la difference de multiplier
+    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_sub(amount).ok_or(ErrorCode::NumErr)?;
 
     Ok(())
 }

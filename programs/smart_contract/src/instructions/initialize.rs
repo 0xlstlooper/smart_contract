@@ -38,6 +38,9 @@ pub fn handler(ctx: Context<Initialize>, start_tick: u64, tick_size: u64) -> Res
     // all_assets.assets = [Default::default(); MAX_ASSETS];
     all_assets.start_tick = start_tick;
     all_assets.tick_size = tick_size;
+    all_assets.global_multiplier = 1;
+    all_assets.amount = 0;
+    all_assets.last_update_timestamp = Clock::get()?.unix_timestamp;
 
     Ok(())
 }

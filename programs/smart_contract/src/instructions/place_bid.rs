@@ -4,7 +4,7 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 
-use crate::state::{AllAssets, LenderDeposit, Orderbook, ORDERBOOK_SIZE};
+use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::errors::ErrorCode;
 
 #[derive(Accounts)]
@@ -25,11 +25,11 @@ pub struct PlaceBid<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + LenderDeposit::INIT_SPACE,
-        seeds = [b"lender_deposit", payer.key().as_ref(), mint_asset.key().as_ref(), &tick.to_le_bytes()],
+        space = 8 + LooperDeposit::INIT_SPACE,
+        seeds = [b"looper_deposit", payer.key().as_ref(), mint_asset.key().as_ref(), &tick.to_le_bytes()],
         bump,
     )]
-    pub lender_deposit: Account<'info, LenderDeposit>,
+    pub looper_deposit: Account<'info, LooperDeposit>,
 
     // Compte de tokens de l'utilisateur pour l'actif
     #[account(
@@ -87,12 +87,12 @@ pub fn handler(ctx: Context<PlaceBid>, slot_index: usize, amount: u64) -> Result
     transfer_checked(cpi_ctx, amount, ctx.accounts.mint_asset.decimals)?;
 
     // 4. Initialiser le compte de dépôt du prêteur (le ticket)
-    let lender_deposit = &mut ctx.accounts.lender_deposit;
-    lender_deposit.lender = ctx.accounts.payer.key();
-    lender_deposit.mint_asset = ctx.accounts.mint_asset.key();
-    lender_deposit.slot_index = slot_index as u64;
-    lender_deposit.amount = amount;
-    lender_deposit.bump = ctx.bumps.lender_deposit;
+    let looper_deposit = &mut ctx.accounts.looper_deposit;
+    looper_deposit.lender = ctx.accounts.payer.key();
+    looper_deposit.mint_asset = ctx.accounts.mint_asset.key();
+    looper_deposit.slot_index = slot_index as u64;
+    looper_deposit.amount = amount;
+    looper_deposit.bump = ctx.bumps.looper_deposit;
 
     Ok(())
 }

@@ -1,5 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::errors::ErrorCode;
+use crate::constants::*;
 
 pub const MAX_ASSETS: u64 = 2;
 pub const ORDERBOOK_SIZE: usize = 10;
@@ -34,17 +35,47 @@ pub struct AllAssets {
     pub start_tick: u64,
     pub tick_size: u64,
     // Total amount of SOL deposited by lenders in this market
-    pub amount: u64,
+    pub amount: u64,            // Amounts of SOL deposited by lenders
+    pub global_multiplier: u64, // Start at 1, increases over time to reflect interest accrued
+    pub last_update_timestamp: i64,
 }
 
 /* Invariant of the structure:
-todo
+    todo
 
 */
 
 impl AllAssets {
+    pub fn update_timestamp_and_multiplier(&mut self) -> Result<()> {
+        let current_timestamp = Clock::get()?.unix_timestamp;
+        let time_elapsed = current_timestamp.checked_sub(self.last_update_timestamp).ok_or(ErrorCode::NumErr)?;
+        if time_elapsed > 0 && self.amount > 0 {
+            // Todo checker les maths
+            // Update the global multiplier based on time elapsed
+            let interest_rate_per_second = self.current_apy()?
+                .checked_div(SCALE_APY)
+                .ok_or(ErrorCode::NumErr)?; // in per seconds
+            let additional_multiplier = (interest_rate_per_second as u128)
+                .checked_mul(time_elapsed as u128)
+                .ok_or(ErrorCode::NumErr)?
+                .checked_mul(self.global_multiplier as u128)
+                .ok_or(ErrorCode::NumErr)?
+                .checked_div(SCALE_GLOBAL_MULTIPLIER as u128)
+                .ok_or(ErrorCode::NumErr)? as u64;
+            self.global_multiplier = self.global_multiplier.checked_add(additional_multiplier).ok_or(ErrorCode::NumErr)?;
+            self.last_update_timestamp = current_timestamp;
+        }
+        Ok(())
+    }
+
+    pub fn current_apy(&self) -> Result<u64> {
+        Ok(self.start_tick)
+    }
+
+
     // Returns (best_tick, index of the related asset, liquidity of this tick of this asset)
     // Maximize only the tick, not the liquidity - for the same tick, it does not matter which asset we choose
+    // Useless ?
     pub fn current_best_apy(&self) -> Result<(u64, usize, u64)> {
         let mut best_offer: Option<(u64, usize, u64)> = None;
 
@@ -153,6 +184,8 @@ mod tests {
             start_tick: 100,
             tick_size: 10,
             amount: 0,
+            global_multiplier: 1,
+            last_update_timestamp: 0,
         }
     }
 

@@ -4,6 +4,7 @@ mod errors;
 mod instructions;
 mod state;
 mod manage_transfer;
+mod constants;
 
 use instructions::*;
 

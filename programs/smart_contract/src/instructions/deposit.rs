@@ -4,10 +4,11 @@ use anchor_spl::{
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
 use crate::errors::ErrorCode;
-use crate::state::{AllAssets};
+use crate::state::{AllAssets, LenderDeposit};
 use crate::manage_transfer::*;
 
 #[derive(Accounts)]
+#[instruction(amount: u64)]
 pub struct Deposit<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -18,6 +19,15 @@ pub struct Deposit<'info> {
         bump,
     )]
     pub all_assets: Account<'info, AllAssets>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + LenderDeposit::INIT_SPACE,
+        seeds = [b"lender_deposit", payer.key().as_ref()],
+        bump,
+    )]
+    pub lender_deposit: Account<'info, LenderDeposit>,
 
     /// CHECK: ok
     #[account(
@@ -51,6 +61,33 @@ pub fn handler<'info>(
         &ctx.accounts.vault_authority,
         &mut ctx.accounts.token_program,
     )?;
+
+    // Update lender_deposit account
+    let lender_deposit = &mut ctx.accounts.lender_deposit; // Todo check the re init attack
+
+    lender_deposit.lender = ctx.accounts.payer.key();
+    // First initialization
+    if lender_deposit.start_multiplier == 0 {
+        lender_deposit.amount = amount;
+        lender_deposit.start_multiplier = ctx.accounts.all_assets.global_multiplier;
+    } else {
+        // First, scale the existing amount to the current global multiplier
+        let scaled_amount = (lender_deposit.amount as u128)
+            .checked_mul(ctx.accounts.all_assets.global_multiplier as u128)
+            .ok_or(ErrorCode::NumErr)?
+            .checked_div(lender_deposit.start_multiplier as u128)
+            .ok_or(ErrorCode::NumErr)? as u64; // Ce truc peut jamais overflow?
+        // Then add the new amount
+        lender_deposit.amount = scaled_amount
+            .checked_add(amount)
+            .ok_or(ErrorCode::NumErr)?;
+        // Finally, update the start_multiplier to the current global multiplier
+        lender_deposit.start_multiplier = ctx.accounts.all_assets.global_multiplier;
+    }
+    lender_deposit.bump = ctx.bumps.lender_deposit;
+
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
+    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
 
     Ok(())
 }

@@ -13,6 +13,9 @@ pub enum ErrorCode {
     OwnerMismatch,
     #[msg("Vault asset account owner is not the vault authority.")]
     VaultOwnerMismatch,
+    // Withdraw
+    #[msg("Insufficient funds in the vault for withdrawal.")]
+    InsufficientVaultFunds,
     // Add Asset
     #[msg("Asset already initialized")]
     AssetAlreadyInitialized,
@@ -35,4 +38,7 @@ pub enum ErrorCode {
     ShouldBeNoDepositAmounts,
     #[msg("Data structure invariant broken: there should be no withdraw amounts in a deposit request.")]
     ShouldBeNoWithdrawAmounts,
+    // Number overflow/underflow
+    #[msg("Number overflow/underflow occurred.")]
+    NumErr,
 }
