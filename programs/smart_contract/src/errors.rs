@@ -13,7 +13,7 @@ pub enum ErrorCode {
     AllAssetsIsFull,
     
     // Deposit
-    #[msg("Ser deposit at least something 🐀")]
+    #[msg("Giiiirl pls deposit at least something 🐀")]
     LuserEstUnRat,
     #[msg("The number of amounts does not match the number of asset account sets.")]
     InvalidInputLength,
