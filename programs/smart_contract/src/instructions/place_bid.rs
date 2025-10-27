@@ -3,49 +3,32 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
-
-use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::errors::ErrorCode;
+use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
+use crate::manage_transfer::*;
 
 #[derive(Accounts)]
-#[instruction(tick: u64)]
+#[instruction(asset_index: u64, slot_index: u64)]
 pub struct PlaceBid<'info> {
+
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub all_assets: Account<'info, AllAssets>,
+
     #[account(
         mut,
-        seeds = [b"orderbook", mint_asset.key().as_ref()],
+        seeds = [b"all_assets", all_assets.base_asset.key().as_ref()],
         bump,
     )]
-    pub orderbook: Account<'info, Orderbook>,
-    pub mint_asset: InterfaceAccount<'info, Mint>,
+    pub all_assets: Account<'info, AllAssets>,
 
-    // Ce PDA sert de "ticket" pour que le prêteur puisse retirer son offre plus tard.
     #[account(
-        init,
+        init, // Well we could use init if needed too here but too lazy to do it for now
         payer = payer,
         space = 8 + LooperDeposit::INIT_SPACE,
-        seeds = [b"looper_deposit", payer.key().as_ref(), mint_asset.key().as_ref(), &tick.to_le_bytes()],
+        seeds = [b"looper_deposit", payer.key().as_ref(), &asset_index.to_le_bytes(), &slot_index.to_le_bytes()],
         bump,
     )]
     pub looper_deposit: Account<'info, LooperDeposit>,
-
-    // Compte de tokens de l'utilisateur pour l'actif
-    #[account(
-        mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = payer,
-    )]
-    pub source_account: InterfaceAccount<'info, TokenAccount>,
-    
-    // Le coffre-fort (vault) pour l'actif
-    #[account(
-        mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = vault_authority,
-    )]
-    pub vault_asset: InterfaceAccount<'info, TokenAccount>,
 
     /// CHECK: ok
     #[account(
@@ -54,44 +37,71 @@ pub struct PlaceBid<'info> {
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
-    // Programmes
+    // Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<PlaceBid>, slot_index: usize, amount: u64) -> Result<()> {
-    // 1. Calculer l'index du slot à partir du tick
-    let all_assets = &ctx.accounts.all_assets;
-    let orderbook = &mut ctx.accounts.orderbook;
+pub fn handler<'info>(
+    ctx: Context<'_, '_, 'info, 'info, PlaceBid<'info>>,
+    asset_index: usize,
+    slot_index: usize,
+    amount: u64,
+) -> Result<()> {
 
-    require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex);
-    // require!(tick >= all_assets.start_tick, ErrorCode::TickTooLow);
-    // require!(tick <= all_assets.start_tick + all_assets.tick_size * (ORDERBOOK_SIZE as u64 - 1), ErrorCode::TickTooHigh);
-    // require!(tick % all_assets.tick_size == 0, ErrorCode::TickNotAligned);
-    // let slot_index = ((tick - all_assets.start_tick) / all_assets.tick_size) as usize;
-    // require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex); // Shouldn't happen
+    // Update global multiplier - todo faudrait factoriser cette merde qq part
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
 
-    // 2. Mettre à jour l'orderbook
-    orderbook.slots[slot_index] = orderbook.slots[slot_index].checked_add(amount).unwrap();
+    require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
+    require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
+    require!(amount > 0, ErrorCode::LuserEstUnRat);
 
-    // 3. Transférer les tokens vers le coffre-fort
-    let cpi_accounts = TransferChecked {
-        from: ctx.accounts.source_account.to_account_info(),
-        mint: ctx.accounts.mint_asset.to_account_info(),
-        to: ctx.accounts.vault_asset.to_account_info(),
-        authority: ctx.accounts.payer.to_account_info(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-    transfer_checked(cpi_ctx, amount, ctx.accounts.mint_asset.decimals)?;
+    // Update the book
+    let all_assets = &mut ctx.accounts.all_assets;
+    all_assets.assets[asset_index].orderbook.slots[slot_index] = all_assets.assets[asset_index].orderbook.slots[slot_index].checked_add(amount).ok_or(ErrorCode::NumErr)?;
 
-    // 4. Initialiser le compte de dépôt du prêteur (le ticket)
+    // Delta splits
+    let delta_split = all_assets.delta_split_looper(asset_index, slot_index, amount, true)?;
+    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+
+    // Split the remaining accounts accordingly between deposit and withdraw
+    let deposit_remaining_accounts = &ctx.remaining_accounts[0..3*deposit_amounts.len()];
+    let withdraw_remaining_accounts = &ctx.remaining_accounts[3*deposit_amounts.len()..];
+
+    // Deposit
+    manage_deposit(
+        &deposit_amounts,
+        &deposit_mints,
+        &deposit_remaining_accounts,
+        &ctx.accounts.payer,
+        &ctx.accounts.vault_authority,
+        &mut ctx.accounts.token_program,
+    )?;
+
+    // Prepare the signer seeds for the vault authority PDA
+    let bump = ctx.bumps.vault_authority;
+    let signer_seeds = &[&b"vault_authority"[..], &[bump]];
+    let signer = &[&signer_seeds[..]];
+
+    // Withdraw
+    manage_withdraw(
+        &withdraw_amounts,
+        &withdraw_mints,
+        &withdraw_remaining_accounts,
+        &ctx.accounts.payer,
+        &ctx.accounts.vault_authority,
+        &mut ctx.accounts.token_program,
+        signer,
+    )?;
+
+    // Initialize looper_deposit account
     let looper_deposit = &mut ctx.accounts.looper_deposit;
-    looper_deposit.lender = ctx.accounts.payer.key();
-    looper_deposit.mint_asset = ctx.accounts.mint_asset.key();
+    looper_deposit.looper = ctx.accounts.payer.key();
+    looper_deposit.asset_index = asset_index as u64;
     looper_deposit.slot_index = slot_index as u64;
     looper_deposit.amount = amount;
+    looper_deposit.last_multiplier = ctx.accounts.all_assets.assets[asset_index].orderbook.looper_multiplier[slot_index];
     looper_deposit.bump = ctx.bumps.looper_deposit;
 
     Ok(())

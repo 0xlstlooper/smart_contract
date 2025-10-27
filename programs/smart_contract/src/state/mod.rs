@@ -1,20 +1,10 @@
-    use anchor_lang::prelude::*;
+use anchor_lang::prelude::*;
 
 pub mod all_assets; 
 pub use all_assets::*;
 
 pub mod deposit;
 pub use deposit::*;
-
-#[account]
-#[derive(InitSpace)]
-pub struct LooperDeposit {
-    pub lender: Pubkey,
-    pub mint_asset: Pubkey,
-    pub slot_index: u64,
-    pub amount: u64,
-    pub bump: u8,
-}
 
 #[account]
 pub struct Bid {

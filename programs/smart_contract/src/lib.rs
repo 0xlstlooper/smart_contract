@@ -19,10 +19,10 @@ pub mod smart_contract {
         instructions::initialize::handler(ctx, start_tick, tick_size)
     }
     // Add an asset to a market - by admin
-    pub fn add_asset(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
-        instructions::add_asset::handler(ctx, multiplier)
+    pub fn add_asset(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
+        instructions::add_asset::handler(ctx, leverage)
     }
-    // Lenders' section
+    // Lenders' section -- todo refactor ces commentaires et les mettre dans un readme
     /*
         Flow of use:
         + The frontend of the lender checks which tokenS and amounts of them he is supposed to deposit
@@ -47,12 +47,12 @@ pub mod smart_contract {
         Flow of use: -- todo factoriser les transfers dans une autre fonction pcq ces fonctions font ça aussi
 
     */
-    pub fn place_bid(ctx: Context<PlaceBid>, slot_index: u64, amount: u64) -> Result<()> {
-        instructions::place_bid::handler(ctx, slot_index as usize, amount)
+    pub fn place_bid<'info>(ctx: Context<'_, '_, 'info, 'info, PlaceBid<'info>>, asset_index: u64, slot_index: u64, amount: u64) -> Result<()> {
+        instructions::place_bid::handler(ctx, asset_index as usize, slot_index as usize, amount)
     }
     // Todo change bid?
     // -- A looper function
-    pub fn remove_bid(ctx: Context<RemoveBid>) -> Result<()> {
-        instructions::remove_bid::handler(ctx)
+    pub fn remove_bid<'info>(ctx: Context<'_, '_, 'info, 'info, RemoveBid<'info>>, asset_index: u64, slot_index: u64) -> Result<()> {
+        instructions::remove_bid::handler(ctx, asset_index as usize, slot_index as usize)
     }
 }

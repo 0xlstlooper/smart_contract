@@ -12,6 +12,7 @@ use crate::manage_transfer::*;
 #[derive(Accounts)]
 #[instruction(amount: u64)]
 pub struct Deposit<'info> {
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -38,6 +39,7 @@ pub struct Deposit<'info> {
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
+    // Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -49,7 +51,9 @@ pub fn handler<'info>(
     amount: u64
 ) -> Result<()> {
 
-    // Update global multiplier - before deposit
+    require!(amount > 0, ErrorCode::LuserEstUnRat);
+
+    // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
     ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
 
@@ -74,9 +78,9 @@ pub fn handler<'info>(
     // First initialization we just set the multiplier and amount
     if lender_deposit.last_multiplier == 0 {
         lender_deposit.amount = amount;
-        lender_deposit.last_multiplier = ctx.accounts.all_assets.global_multiplier;
+        lender_deposit.last_multiplier = ctx.accounts.all_assets.lender_multiplier;
     } else {
-        lender_deposit.adjust_for_global_multiplier(ctx.accounts.all_assets.global_multiplier as u128)?;
+        lender_deposit.adjust_for_lender_multiplier(ctx.accounts.all_assets.lender_multiplier as u128)?;
         lender_deposit.amount = lender_deposit.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
     }
     lender_deposit.bump = ctx.bumps.lender_deposit;

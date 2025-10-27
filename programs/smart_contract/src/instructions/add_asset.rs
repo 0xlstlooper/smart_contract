@@ -38,32 +38,25 @@ pub struct AddAsset<'info> {
         associated_token::authority = vault_authority,
     )]
     pub vault_asset: InterfaceAccount<'info, TokenAccount>,
-    // Orderbook
-    #[account(
-        init,
-        payer = payer,
-        seeds = [b"orderbook", mint_asset.key().as_ref()],
-        bump,
-        space = 8 + Orderbook::INIT_SPACE,
-    )]
-    pub orderbook: Account<'info, Orderbook>,
-    // Rest
+
+    // Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<AddAsset>, multiplier: u64) -> Result<()> {
+pub fn handler(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
     let idx = ctx.accounts.all_assets.size_assets;
     require!(idx < MAX_ASSETS, ErrorCode::AllAssetsIsFull);
     ctx.accounts.all_assets.size_assets += 1;
     let all_assets = &mut ctx.accounts.all_assets.assets;
     let asset = &mut all_assets[idx as usize];
     // Verify asset is not initialized yet
-    require!(asset.multiplier == 0, ErrorCode::AssetAlreadyInitialized);
+    // Todo cette ligne sert a que dalle
+    require!(asset.leverage == 0, ErrorCode::AssetAlreadyInitialized);
     asset.mint = ctx.accounts.mint_asset.key();
     asset.vault = ctx.accounts.vault_asset.key();
-    asset.multiplier = multiplier;  
+    asset.leverage = leverage;
 
     Ok(())
 }

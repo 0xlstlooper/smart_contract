@@ -3,48 +3,32 @@ use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
 };
-
-use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::errors::ErrorCode;
+use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
+use crate::manage_transfer::*;
 
 #[derive(Accounts)]
+#[instruction(asset_index: u64, slot_index: u64)]
 pub struct RemoveBid<'info> {
+
     #[account(mut)]
     pub payer: Signer<'info>,
-    pub all_assets: Account<'info, AllAssets>,
+
     #[account(
         mut,
-        seeds = [b"orderbook", mint_asset.key().as_ref()],
+        seeds = [b"all_assets", all_assets.base_asset.key().as_ref()],
         bump,
     )]
-    pub orderbook: Account<'info, Orderbook>,
-    pub mint_asset: InterfaceAccount<'info, Mint>,
+    pub all_assets: Account<'info, AllAssets>,
 
-    // Le "ticket" PDA, qui sera fermé après le retrait de l'offre
+    // Looper deposit to be closed
     #[account(
         mut,
         close = payer,
-        seeds = [b"lender_deposit", payer.key().as_ref(), mint_asset.key().as_ref(), &lender_deposit.slot_index.to_le_bytes()],
-        bump = lender_deposit.bump,
-        constraint = payer.key() == lender_deposit.lender @ ErrorCode::OnlyOriginalLender,
+        seeds = [b"looper_deposit", payer.key().as_ref(), &asset_index.to_le_bytes(), &slot_index.to_le_bytes()],
+        bump = looper_deposit.bump,
     )]
-    pub lender_deposit: Account<'info, LooperDeposit>,
-
-    // Compte de tokens de l'utilisateur pour l'actif
-    #[account(
-        mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = payer,
-    )]
-    pub destination_account: InterfaceAccount<'info, TokenAccount>,
-    
-    // Le coffre-fort pour l'actif
-    #[account(
-        mut,
-        associated_token::mint = mint_asset,
-        associated_token::authority = vault_authority,
-    )]
-    pub vault_asset: InterfaceAccount<'info, TokenAccount>,
+    pub looper_deposit: Account<'info, LooperDeposit>,
 
     /// CHECK: ok
     #[account(
@@ -53,42 +37,58 @@ pub struct RemoveBid<'info> {
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
-    // Programmes
+    // Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<RemoveBid>) -> Result<()> {
-    // 1. Obtenir les informations du compte de dépôt
-    let lender_deposit = &ctx.accounts.lender_deposit;
-    let slot_index = lender_deposit.slot_index as usize;
-    let amount = lender_deposit.amount;
+pub fn handler<'info>(
+    ctx: Context<'_, '_, 'info, 'info, RemoveBid<'info>>,
+    asset_index: usize,
+    slot_index: usize,
+) -> Result<()> {
 
-    // 2. Calculer l'index du slot
-    let all_assets = &ctx.accounts.all_assets;
-    require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidTickIndex);
+    // Update global multiplier
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
 
-    // 3. Mettre à jour l'orderbook
-    let orderbook = &mut ctx.accounts.orderbook;
-    orderbook.slots[slot_index] = orderbook.slots[slot_index].checked_sub(amount).unwrap();
+    // Get the amount from the deposit account before it's closed
+    let amount = ctx.accounts.looper_deposit.amount;
 
-    // 4. Renvoyer les tokens à l'utilisateur
+    require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
+    require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
+    require!(amount > 0, ErrorCode::LuserEstUnRat);
+
+    // Update the book
+    let all_assets = &mut ctx.accounts.all_assets;
+    all_assets.assets[asset_index].orderbook.slots[slot_index] = all_assets.assets[asset_index].orderbook.slots[slot_index].checked_sub(amount).ok_or(ErrorCode::NumErr)?;
+
+    // Delta splits for withdrawal. `false` indicates a withdrawal.
+    let delta_split = all_assets.delta_split_looper(asset_index, slot_index, amount, false)?;
+    
+    // For a simple withdrawal, we expect the deposit part to be empty
+    let ((deposit_amounts, _), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    
+    // Ensure no deposits are being made - is it actually the case, todo verifier
+    require!(deposit_amounts.is_empty(), ErrorCode::ShouldBeNoDepositAmountsInRemoveBid);
+
+    // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;
     let signer_seeds = &[&b"vault_authority"[..], &[bump]];
     let signer = &[&signer_seeds[..]];
 
-    let cpi_accounts = TransferChecked {
-        from: ctx.accounts.vault_asset.to_account_info(),
-        mint: ctx.accounts.mint_asset.to_account_info(),
-        to: ctx.accounts.destination_account.to_account_info(),
-        authority: ctx.accounts.vault_authority.to_account_info(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, signer);
-    transfer_checked(cpi_ctx, amount, ctx.accounts.mint_asset.decimals)?;
+    // Withdraw the assets back to the user using the same helper function
+    manage_withdraw(
+        &withdraw_amounts,
+        &withdraw_mints,
+        &ctx.remaining_accounts, // All remaining accounts are for withdrawals
+        &ctx.accounts.payer,
+        &ctx.accounts.vault_authority,
+        &mut ctx.accounts.token_program,
+        signer,
+    )?;
 
-    // 5. Le compte lender_deposit est fermé automatiquement par Anchor grâce à la contrainte `close = payer`
+    // The looper_deposit account is closed automatically by Anchor via the `close = payer` constraint.
 
     Ok(())
 }

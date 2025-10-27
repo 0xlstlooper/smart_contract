@@ -12,14 +12,15 @@ The last index is the highest APY offered - index i corresponds to start_tick + 
 #[account]
 #[derive(InitSpace)]
 pub struct Orderbook {
-    pub slots: [u64; ORDERBOOK_SIZE],
+    pub slots:             [u64; ORDERBOOK_SIZE],
+    pub looper_multiplier: [u64; ORDERBOOK_SIZE],
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct AssetInfo {
     pub mint: Pubkey,
     pub vault: Pubkey,
-    pub multiplier: u64, // Related to the LTV of the asset
+    pub leverage: u64, // Related to the LTV of the asset
     pub orderbook: Orderbook,
 }
 
@@ -36,7 +37,7 @@ pub struct AllAssets {
     pub tick_size: u64,
     // Total amount of SOL deposited by lenders in this market
     pub amount: u64,            // Not used?
-    pub global_multiplier: u64, // Start at 1, increases over time to reflect interest accrued
+    pub lender_multiplier: u64, // Start at 1, increases over time to reflect interest accrued for the lenders
     pub last_update_timestamp: i64,
 }
 
@@ -46,6 +47,7 @@ pub struct AllAssets {
 */
 
 impl AllAssets {
+    // Todo update aussi tous les multipliers de tous les assets selectionnés par l'enchere
     pub fn update_timestamp_and_multiplier(&mut self) -> Result<()> {
         let current_timestamp = Clock::get()?.unix_timestamp;
         let time_elapsed = current_timestamp.checked_sub(self.last_update_timestamp).ok_or(ErrorCode::NumErr)?;
@@ -58,11 +60,11 @@ impl AllAssets {
             let additional_multiplier = (interest_rate_per_second as u128)
                 .checked_mul(time_elapsed as u128)
                 .ok_or(ErrorCode::NumErr)?
-                .checked_mul(self.global_multiplier as u128)
+                .checked_mul(self.lender_multiplier as u128)
                 .ok_or(ErrorCode::NumErr)?
-                .checked_div(SCALE_GLOBAL_MULTIPLIER as u128)
+                .checked_div(SCALE_MULTIPLIER as u128)
                 .ok_or(ErrorCode::NumErr)? as u64;
-            self.global_multiplier = self.global_multiplier.checked_add(additional_multiplier).ok_or(ErrorCode::NumErr)?;
+            self.lender_multiplier = self.lender_multiplier.checked_add(additional_multiplier).ok_or(ErrorCode::NumErr)?;
             self.last_update_timestamp = current_timestamp;
         }
         Ok(())
@@ -146,10 +148,10 @@ impl AllAssets {
     }
 
     /* Basically, same as above, but for loopers
-    Whats the new repartition once we apply a change of `delta` to asset of index `index`, at slot `slot`
+    Whats the new repartition once we apply a change of `delta` to asset `asset_index` at slot `slot_index`
     */
-    pub fn delta_split_looper(&self, index: u64, slot: u64, delta: u64, sign: bool) -> Result<Vec<(u64, u64)>> {
-        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+    pub fn delta_split_looper(&self, asset_index: usize, slot_index: usize, delta: u64, sign: bool) -> Result<Vec<(u64, i128)>> {
+        let mut result: Vec<(u64, i128)> = vec![(0, 0); self.size_assets as usize];
         Ok(result)
     }
 }
@@ -166,17 +168,19 @@ mod tests {
                 AssetInfo {
                     mint: Pubkey::default(),
                     vault: Pubkey::default(),
-                    multiplier: 1,
+                    leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],
+                        looper_multiplier: [1; ORDERBOOK_SIZE],
                     },
                 },
                 AssetInfo {
                     mint: Pubkey::default(),
                     vault: Pubkey::default(),
-                    multiplier: 1,
+                    leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],
+                        looper_multiplier: [1; ORDERBOOK_SIZE],
                     },
                 },
             ],
@@ -184,7 +188,7 @@ mod tests {
             start_tick: 100,
             tick_size: 10,
             amount: 0,
-            global_multiplier: 1,
+            lender_multiplier: 1,
             last_update_timestamp: 0,
         }
     }

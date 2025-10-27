@@ -10,6 +10,7 @@ use crate::manage_transfer::*;
 #[derive(Accounts)]
 #[instruction(amount: u64)]
 pub struct Withdraw<'info> {
+
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -35,6 +36,7 @@ pub struct Withdraw<'info> {
     )]
     pub vault_authority: UncheckedAccount<'info>,
 
+    // Programs
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
@@ -46,13 +48,13 @@ pub fn handler<'info>(
     amount: u64
 ) -> Result<()> {
 
-    // Update global multiplier - before deposit
+    // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
     ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_sub(amount).ok_or(ErrorCode::NumErr)?;
 
     // Update lender_deposit account
     let lender_deposit = &mut ctx.accounts.lender_deposit;
-    lender_deposit.adjust_for_global_multiplier(ctx.accounts.all_assets.global_multiplier as u128)?;
+    lender_deposit.adjust_for_lender_multiplier(ctx.accounts.all_assets.lender_multiplier as u128)?;
     
     // Now, the total money we can withdraw at max is lender_deposit.amount
     // To ease the user, if amount > lender_deposit.amount, we just withdraw all the money

@@ -13,3 +13,8 @@ Test: `anchor test`.
 In file `state/all_assets.rs`.
 
 Run its isolated tests: `cargo test`.
+
+
+## Whats unclear to me
+
++ How do we receive tokens we dont have an account for, yet. Do we have to pay for it? Can i receive it, swap them, and close them in a single tx?
