@@ -7,6 +7,8 @@ use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LenderDeposit};
 use crate::manage_transfer::*;
 
+// Todo check the re init attack
+
 #[derive(Accounts)]
 #[instruction(amount: u64)]
 pub struct Deposit<'info> {
@@ -41,18 +43,22 @@ pub struct Deposit<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// Todo refactoriser pour plus prendre en argument les mints
 // Structure of remaining_accounts: for each asset being deposited: [source_account, vault_asset, mint_asset]
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Deposit<'info>>, 
     amount: u64
 ) -> Result<()> {
 
+    // Update global multiplier - before deposit
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
+    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
+
     // The amounts we are supposed to deposit for each asset. `true` for deposit.
     let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, true)?;
     let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
     require!(withdraw_amounts.len() == 0, ErrorCode::ShouldBeNoWithdrawAmounts);
 
+    // Do the actual deposits
     manage_deposit(
         &deposit_amounts,
         &deposit_mints,
@@ -63,31 +69,17 @@ pub fn handler<'info>(
     )?;
 
     // Update lender_deposit account
-    let lender_deposit = &mut ctx.accounts.lender_deposit; // Todo check the re init attack
-
+    let lender_deposit = &mut ctx.accounts.lender_deposit;
     lender_deposit.lender = ctx.accounts.payer.key();
-    // First initialization
-    if lender_deposit.start_multiplier == 0 {
+    // First initialization we just set the multiplier and amount
+    if lender_deposit.last_multiplier == 0 {
         lender_deposit.amount = amount;
-        lender_deposit.start_multiplier = ctx.accounts.all_assets.global_multiplier;
+        lender_deposit.last_multiplier = ctx.accounts.all_assets.global_multiplier;
     } else {
-        // First, scale the existing amount to the current global multiplier
-        let scaled_amount = (lender_deposit.amount as u128)
-            .checked_mul(ctx.accounts.all_assets.global_multiplier as u128)
-            .ok_or(ErrorCode::NumErr)?
-            .checked_div(lender_deposit.start_multiplier as u128)
-            .ok_or(ErrorCode::NumErr)? as u64; // Ce truc peut jamais overflow?
-        // Then add the new amount
-        lender_deposit.amount = scaled_amount
-            .checked_add(amount)
-            .ok_or(ErrorCode::NumErr)?;
-        // Finally, update the start_multiplier to the current global multiplier
-        lender_deposit.start_multiplier = ctx.accounts.all_assets.global_multiplier;
+        lender_deposit.adjust_for_global_multiplier(ctx.accounts.all_assets.global_multiplier as u128)?;
+        lender_deposit.amount = lender_deposit.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
     }
     lender_deposit.bump = ctx.bumps.lender_deposit;
-
-    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
-    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_add(amount).ok_or(ErrorCode::NumErr)?;
 
     Ok(())
 }

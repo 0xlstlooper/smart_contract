@@ -35,7 +35,7 @@ pub struct AllAssets {
     pub start_tick: u64,
     pub tick_size: u64,
     // Total amount of SOL deposited by lenders in this market
-    pub amount: u64,            // Amounts of SOL deposited by lenders
+    pub amount: u64,            // Not used?
     pub global_multiplier: u64, // Start at 1, increases over time to reflect interest accrued
     pub last_update_timestamp: i64,
 }

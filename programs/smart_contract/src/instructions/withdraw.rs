@@ -28,7 +28,7 @@ pub struct Withdraw<'info> {
     )]
     pub lender_deposit: Account<'info, LenderDeposit>,
 
-    /// CHECK: This is the vault's authority, a PDA. Its seeds are verified in the transfer.
+    /// CHECK: ok
     #[account(
         seeds = [b"vault_authority"],
         bump
@@ -45,6 +45,25 @@ pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>,
     amount: u64
 ) -> Result<()> {
+
+    // Update global multiplier - before deposit
+    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
+    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_sub(amount).ok_or(ErrorCode::NumErr)?;
+
+    // Update lender_deposit account
+    let lender_deposit = &mut ctx.accounts.lender_deposit;
+    lender_deposit.adjust_for_global_multiplier(ctx.accounts.all_assets.global_multiplier as u128)?;
+    
+    // Now, the total money we can withdraw at max is lender_deposit.amount
+    // To ease the user, if amount > lender_deposit.amount, we just withdraw all the money
+    // - this is tricky for the frontend because well if amount changes, the delta_split changes too, so are the tokens we get and the swap we need to execute, but yeah
+    let amount = if amount > lender_deposit.amount {
+        lender_deposit.amount
+    } else {
+        amount
+    };
+    // Now, we proceed to the rest of the code
+    lender_deposit.amount = lender_deposit.amount.checked_sub(amount).ok_or(ErrorCode::InsufficientVaultFunds)?;
 
     // The amounts we are supposed to withdraw for each asset. `false` for withdrawal.
     let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, false)?;
@@ -66,18 +85,10 @@ pub fn handler<'info>(
         signer,
     )?;
 
-    let lender_deposit = &mut ctx.accounts.lender_deposit;
-    lender_deposit.amount = lender_deposit.amount.checked_sub(amount).ok_or(ErrorCode::InsufficientVaultFunds)?;
-    // Todo les autres params
-
     // Close the lender_deposit account if amount is zero
     if lender_deposit.amount == 0 {
         lender_deposit.close(ctx.accounts.payer.to_account_info())?;
     }
-
-    ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
-    // todo la c'est amount mais scaled avec la difference de multiplier
-    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_sub(amount).ok_or(ErrorCode::NumErr)?;
 
     Ok(())
 }

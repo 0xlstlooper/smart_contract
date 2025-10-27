@@ -1,10 +1,27 @@
 use anchor_lang::prelude::*;
+use crate::errors::ErrorCode;
 
 #[account]
 #[derive(InitSpace)]
 pub struct LenderDeposit {
     pub lender: Pubkey,
-    pub amount: u64,           // Amount of SOL deposited
-    pub start_multiplier: u64, // Value of the global multiplier at the time of deposit
+    pub amount: u64,          // Amount of SOL our deposit is worth - change over time
+    pub last_multiplier: u64, // Value of the global multiplier at our last interaction
     pub bump: u8,
+}
+
+impl LenderDeposit {
+    pub fn adjust_for_global_multiplier(&mut self, current_global_multiplier: u128) -> Result<()> {
+        // Adjust the amount based on the change in global multiplier
+        let adjusted_amount = (self.amount as u128)
+            .checked_mul(current_global_multiplier)
+            .ok_or(ErrorCode::NumErr)?
+            .checked_div(self.last_multiplier as u128)
+            .ok_or(ErrorCode::NumErr)? as u64;
+
+        self.amount = adjusted_amount;
+        self.last_multiplier = current_global_multiplier as u64;
+
+        Ok(())
+    }
 }
