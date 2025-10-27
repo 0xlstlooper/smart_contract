@@ -100,7 +100,7 @@ describe("test place bid", () => {
     // Get the associated token address for the vault
     vaultAssetPda1 = getAssociatedTokenAddressSync(mintAsset1, vaultAuthorityPda, true);
 
-    const leverage = new anchor.BN(10); // Example leverage
+    const leverage = new anchor.BN(2 * 1000); // Example leverage = SCALE_LEVERAGE (2x)
 
     // Call the add_asset instruction
     const tx = await program.methods
@@ -124,7 +124,6 @@ describe("test place bid", () => {
     assert.equal(allAssetsAccount.sizeAssets, 1, "Last index should be 1");
     const assetInfo = allAssetsAccount.assets[0];
     assert.ok(assetInfo.mint.equals(mintAsset1), "Mint public key should match");
-    assert.ok(assetInfo.vault.equals(vaultAssetPda1), "Vault public key should match");
     assert.ok(assetInfo.leverage.eq(leverage), "Leverage should match");
   });
 
@@ -141,11 +140,11 @@ describe("test place bid", () => {
     
     vaultAssetPda2 = getAssociatedTokenAddressSync(mintAsset2, vaultAuthorityPda, true);
 
-    const multiplier = new anchor.BN(90); // Example multiplier
+    const leverage = new anchor.BN(3 * 1000); // Example leverage = SCALE_LEVERAGE (3x)
 
     // Call the add_asset instruction
     const tx = await program.methods
-      .addAsset(multiplier)
+      .addAsset(leverage)
       .accounts({
         payer: payer.publicKey,
         allAssets: allAssetsPda,

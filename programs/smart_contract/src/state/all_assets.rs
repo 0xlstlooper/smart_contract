@@ -19,7 +19,6 @@ pub struct Orderbook {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct AssetInfo {
     pub mint: Pubkey,
-    pub vault: Pubkey,
     pub leverage: u64, // Related to the LTV of the asset
     pub orderbook: Orderbook,
 }
@@ -167,7 +166,6 @@ mod tests {
             assets: [
                 AssetInfo {
                     mint: Pubkey::default(),
-                    vault: Pubkey::default(),
                     leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],
@@ -176,7 +174,6 @@ mod tests {
                 },
                 AssetInfo {
                     mint: Pubkey::default(),
-                    vault: Pubkey::default(),
                     leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],

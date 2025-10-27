@@ -4,6 +4,14 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum ErrorCode {
+    // Add Asset
+    #[msg("Leverage must be greater than SCALE_LEVERAGE")]
+    InvalidLeverage,
+    #[msg("Asset already initialized")]
+    AssetAlreadyInitialized,
+    #[msg("The struct AllAssets is full")]
+    AllAssetsIsFull,
+    
     // Deposit
     #[msg("Ser deposit at least something 🐀")]
     LuserEstUnRat,
@@ -15,31 +23,19 @@ pub enum ErrorCode {
     OwnerMismatch,
     #[msg("Vault asset account owner is not the vault authority.")]
     VaultOwnerMismatch,
+
     // Withdraw
     #[msg("Insufficient funds in the vault for withdrawal.")]
     InsufficientVaultFunds,
-    // Add Asset
-    #[msg("Asset already initialized")]
-    AssetAlreadyInitialized,
-    #[msg("The struct AllAssets is full")]
-    AllAssetsIsFull,
-    #[msg("No liquidity available in the orderbook.")]
-    NoLiquidityAvailable,
-    #[msg("Tick is below the allowed range.")]
-    TickTooLow,
-    #[msg("Tick is above the allowed range.")]
-    TickTooHigh,
-    #[msg("Tick should be aligned with tick size.")]
-    TickNotAligned,
-    #[msg("Invalid tick index.")]
-    InvalidTickIndex,
     #[msg("Only the original lender can remove their bid.")]
     OnlyOriginalLender,
+
     // Place bid
     #[msg("Asset index must be below size_assets.")]
     InvalidAssetIndex,
     #[msg("Slot index must be below ORDERBOOK_SIZE.")]
     InvalidSlotIndex,
+
     // Break of invariant of the data structures
     #[msg("Data structure invariant broken: there should be no deposit amounts in a withdraw request.")]
     ShouldBeNoDepositAmounts,
@@ -47,7 +43,12 @@ pub enum ErrorCode {
     ShouldBeNoWithdrawAmounts,
     #[msg("Data structure invariant broken: there should be no deposit amounts in a remove bid request.")]
     ShouldBeNoDepositAmountsInRemoveBid,
+
     // Number overflow/underflow
     #[msg("Number overflow/underflow occurred.")]
     NumErr,
+
+    // Errors of the data structure logic
+    #[msg("No liquidity available in the orderbook.")]
+    NoLiquidityAvailable,
 }
