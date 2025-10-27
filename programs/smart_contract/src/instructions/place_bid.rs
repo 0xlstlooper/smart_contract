@@ -22,7 +22,7 @@ pub struct PlaceBid<'info> {
     pub all_assets: Account<'info, AllAssets>,
 
     #[account(
-        init, // Well we could use init if needed too here but too lazy to do it for now
+        init, // Todo, init if needed
         payer = payer,
         space = 8 + LooperDeposit::INIT_SPACE,
         seeds = [b"looper_deposit", payer.key().as_ref(), &asset_index.to_le_bytes(), &slot_index.to_le_bytes()],

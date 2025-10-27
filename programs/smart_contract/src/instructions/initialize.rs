@@ -15,8 +15,7 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
-    // Used for the PDA of all_assets - but nothing else
-    // It is adviced to call it with actually the base asset mint of the market it documents a bit
+    // This parameter, base_asset, is used only for the PDA of all_assets - nothing else
     pub base_asset: InterfaceAccount<'info, Mint>,
 
     #[account(

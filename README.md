@@ -12,10 +12,10 @@ With a **novel and unique defi primitive**, we solve them both at the same time 
 
 ## How it works? - high level POV
 
-You deposit your idle capital in a vault (there is 1 vault per "distinct asset" (so 1 for $, 1 for sol, 1 for €, etc...)).
-Any **yield farmor** can come, deposit a defi position delta-neutral to that the underlying asset of the vault (eg. deposit JitoSol in the Sol vault, not USDC in the Sol vault, and for now only tokens not entire defi position).
-All the yield farmors do an auction on how much fixed apy they are willing to pay to the vault.
-The yield farmors that won this auction then borrow assets from that vault to leverage their defi position and pay that fixed yield - a bit akin to a multiply position in lending markets, but safer due to the fixed apy.
+You deposit your idle capital in a vault (there is 1 vault per "distinct asset" (so 1 for $, 1 for sol, 1 for €, etc...)).  
+Any **yield farmor** can come, deposit a defi position delta-neutral to that the underlying asset of the vault (eg. deposit JitoSol in the Sol vault, not USDC in the Sol vault, and for now only tokens not entire defi position).  
+All the yield farmors do an auction on how much fixed apy they are willing to pay to the vault.  
+The yield farmors that won this auction then borrow assets from that vault to leverage their defi position and pay that fixed yield - a bit akin to a multiply position in lending markets, but safer due to the fixed apy.  
 
 #### Why participants will want to use the platform?
 
@@ -33,7 +33,7 @@ Market forces will give competitive yield to both participants, the yield farmor
 
 #### Excepted behaviors at equilibrum state
 
-At equilibrium, we except that yield farmors will want an additionnal APY of only a few %, as close to none other options on the market exists to earn additionnal risk-free yield on top of a yield bearing asset. Few %, let's say 3, at 10x leverage, is only a 0.3% difference. Let's round it to 0.5% to compensate also for their increases loses in case of a depeg event.
+At equilibrium, we except that yield farmors will want an additionnal APY of only a few %, as close to none other options on the market exists to earn additionnal risk-free yield on top of a yield bearing asset. Few %, let's say 3, at 10x leverage, is only a 0.3% difference. Let's round it to 0.5% to compensate also for their increases loses in case of a depeg event.  
 Therefore, we except that the yield given by this decentralised aggregator will be the absolute best yield available minus 0.5%, which if the vault earn 10% APY is actually a performance fee of only 5% way below all curated vaults (when at equilibrum, of course now they charge 0% rate), and with actually more "skin in the game" from the curators (here the yield farmors) because if they wish to deploy the vault's money into a risky asset they have to place their own money into that risky asset and loses a lot with small depegs due to leverage.
 
 At equilibrum, we also except that the orderbook composition won't change so much, and as such as a yield farmors it'll be pretty predictable to leverage your yield and earn that additionnal %. Yields of yield bearing assets doesn't change everyday, and even if they do, that's for pretty risky assets which will have a cap on the total composition they can take on the pool. As such, the pool will always be composed of some less risky assets, with stable yields, and being a competitive offer on that asset will be straightforward: the average yield of it minus 0.3%.
@@ -47,21 +47,28 @@ All in all, at equilibrum, we except the whole structure to be quite stable, req
 
 todo
 
-### Whats "interesting"/"unusual" about it
+### Flow of use of the functions of the contract
 
-**There is no slippage parameters**: Something interesting about the app is what does happen when you get frontrunned?
-Let's say you want to deposit 100SOL, you are required to deposit 1000JitoSol, but if someone else deposit before you
-maybe you now need to deposit 1000JupSol. Because we do the swaps outside the smart contract, the transaction will fail and will
-need to be redone.
+Flow of use of lender deposit funds (function `deposit`):  
 
-### Known issues
+The frontend of the lender checks which token**S** and amounts of them he is supposed to deposit.  
+Then, with a single call to this function he deposits all the tokens at once.  
+On deposit, the user must therefore swap its assets to the required assets. He is required to do swaps of 1x the volume he deposited.
 
-Quand un looper swap un asset pour un autre, c’est un peu chiant car il doit payer le cout, et après un autre mec peut venir supply de cet asset et passer devant -> Pour l’instant on laisse comme ça, todo voir en détail, et quand on liste un nouvel asset on peut faire le dépôt initial et payer le cout nous
+Funny enough, because the frontend do the swap separately, if the user gets frontrunned, the transaction will fail because the required tokens to be depositted will be different.  
+--> No slippage parameter for this code, if you get frontrunned, you need to do a new tx.  
+(Although the frontend has a slippage parameter when doing the swaps to get the required tokens, but we use exact output, so the user will always get the exact amount of tokens needed for the deposit, even if what he pays will differ because of slippage)
+
+Flow of use of the rest: same. All the functions are sensible to frontrunning, users dont lose money, they just have txs that fail.
+Volume of swaps required by function called:
++ `Deposit`/`Withdraw`: `1 x amount`.
++ `Place bid`/`Remove bid`:
+    - Either, the required split is the same, and in this case we do no swaps. In this case, `0`.
+    - Or, the required split changes, and we need to do `leverage x amount`. Eg, if the split before was 1yield farmor that deposited 1JupSol such that 10Sol of lenders are split into 10JupSol. Imagine we deposit 1JitoSol such that our offer is more competitive than existing offers, then the 10JupSol must be swapped to 10JitoSol. So the volume of swapped required is `levarage x amount`.
+
+--> One of the known issue that'll need be addressed in the mainnet version, is that ots a bit toxic, that if JitoSol becomes more competitive, and someone do the swap of JupSol to JitoSol, then someone else can then be a more competitive JitoSol offer wihtout doing any swaps, and as such we didn't rewarded who did the swap. Probably the solution is to award whoever did the swap a bonus APY for a given time in order to offset him the cost of the swap. It's still unclear whats the best "game theory" solution. We didn't implement anything related to that in the code, for now whoever did the swap eat the cost.
 
 
-### What's unclear to me
-
-How do we receive tokens we dont have an account for, yet. Do we have to pay for the ret? Can i receive it, swap them, and close them in a single tx?
 
 
 ## How to test/run it
