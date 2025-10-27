@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LenderDeposit};
-use crate::manage_transfer::*;
+use crate::utility::*;
 
 // Todo check the re init attack
 

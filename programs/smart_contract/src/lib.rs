@@ -3,7 +3,7 @@ use anchor_lang::prelude::*;
 mod errors;
 mod instructions;
 mod state;
-mod manage_transfer;
+mod utility;
 mod constants;
 
 use instructions::*;
@@ -35,5 +35,8 @@ pub mod smart_contract {
     }
     pub fn remove_bid<'info>(ctx: Context<'_, '_, 'info, 'info, RemoveBid<'info>>, asset_index: u64, slot_index: u64) -> Result<()> {
         instructions::remove_bid::handler(ctx, asset_index as usize, slot_index as usize)
+    }
+    pub fn liquidate_bid<'info>(ctx: Context<'_, '_, 'info, 'info, LiquidateBid<'info>>, owner: Pubkey, asset_index: u64, slot_index: u64) -> Result<()> {
+        instructions::liquidate_bid::handler(ctx, owner, asset_index as usize, slot_index as usize)
     }
 }

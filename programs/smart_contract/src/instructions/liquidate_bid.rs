@@ -6,10 +6,11 @@ use anchor_spl::{
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::utility::*;
+use crate::constants::*;
 
 #[derive(Accounts)]
-#[instruction(asset_index: u64, slot_index: u64)]
-pub struct RemoveBid<'info> {
+#[instruction(owner: Pubkey, asset_index: u64, slot_index: u64)]
+pub struct LiquidateBid<'info> {
 
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -25,10 +26,10 @@ pub struct RemoveBid<'info> {
     #[account(
         mut,
         close = payer,
-        seeds = [b"looper_deposit", payer.key().as_ref(), &asset_index.to_le_bytes(), &slot_index.to_le_bytes()],
-        bump = looper_deposit.bump,
+        seeds = [b"looper_deposit", &owner.as_ref(), &asset_index.to_le_bytes(), &slot_index.to_le_bytes()],
+        bump = to_liquidate.bump,
     )]
-    pub looper_deposit: Account<'info, LooperDeposit>,
+    pub to_liquidate: Account<'info, LooperDeposit>,
 
     /// CHECK: ok
     #[account(
@@ -44,7 +45,8 @@ pub struct RemoveBid<'info> {
 }
 
 pub fn handler<'info>(
-    ctx: Context<'_, '_, 'info, 'info, RemoveBid<'info>>,
+    ctx: Context<'_, '_, 'info, 'info, LiquidateBid<'info>>,
+    owner: Pubkey,
     asset_index: usize,
     slot_index: usize,
 ) -> Result<()> {
@@ -52,9 +54,15 @@ pub fn handler<'info>(
     // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
 
-    let amount = ctx.accounts.looper_deposit.amount;
+    let amount = ctx.accounts.to_liquidate.amount;
     require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
+
+    if amount > LIQUIDATION_MARGIN {
+        return Err(ErrorCode::AboveLiquidationMargin.into());
+    }
+
+    // Now, rest of the code of remove_bid
 
     // Update the book
     let all_assets = &mut ctx.accounts.all_assets;
@@ -85,7 +93,8 @@ pub fn handler<'info>(
         signer,
     )?;
 
-    // The looper_deposit account is closed automatically by Anchor via the `close = payer` constraint.
+    // The to_liquidate account is closed automatically by Anchor via the `close = payer` constraint.
+    // All the money of the account, and the rent, is paid to the liquidator (payer).
 
     Ok(())
 }

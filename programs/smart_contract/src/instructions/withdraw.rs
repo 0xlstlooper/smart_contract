@@ -5,7 +5,7 @@ use anchor_spl::{
 };
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LenderDeposit};
-use crate::manage_transfer::*;
+use crate::utility::*;
 
 #[derive(Accounts)]
 #[instruction(amount: u64)]

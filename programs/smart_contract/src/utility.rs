@@ -5,6 +5,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
 use crate::errors::ErrorCode;
 use crate::state::AllAssets;
+use crate::constants::*;
 
 pub fn delta_split_extraction(
     delta_split: &Vec<(u64, i128)>,
@@ -120,4 +121,10 @@ pub fn manage_withdraw<'info>(
         transfer_checked(cpi_ctx, amounts[i], mint_asset.decimals)?;
     }
     Ok(())
+}
+
+pub fn oracle_quote_price(asset: Pubkey) -> Result<u64> {
+    // Placeholder function - in real implementation, would fetch price from oracle (and would have a cache because we may call it multiple times per tx)
+    // With this placeholder value: 1 yield bearing asset = 1 underlying asset
+    Ok(SCALE_ORACLE_VALUE)
 }

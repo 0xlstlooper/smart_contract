@@ -5,7 +5,8 @@ use anchor_spl::{
 };
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
-use crate::manage_transfer::*;
+use crate::utility::*;
+use crate::constants::*;
 
 #[derive(Accounts)]
 #[instruction(asset_index: u64, slot_index: u64)]
@@ -55,7 +56,7 @@ pub fn handler<'info>(
 
     require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
-    require!(amount > 0, ErrorCode::LuserEstUnRat);
+    require!(amount > MIN_DEPOSIT, ErrorCode::LuserEstUnRat);
 
     // Update the book
     let all_assets = &mut ctx.accounts.all_assets;

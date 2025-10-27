@@ -13,5 +13,8 @@ pub use withdraw::*;
 pub mod place_bid;
 pub use place_bid::*;
 
+pub mod liquidate_bid;
+pub use liquidate_bid::*;
+
 pub mod remove_bid;
 pub use remove_bid::*;

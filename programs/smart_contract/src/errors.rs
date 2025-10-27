@@ -36,6 +36,11 @@ pub enum ErrorCode {
     #[msg("Slot index must be below ORDERBOOK_SIZE.")]
     InvalidSlotIndex,
 
+    // Liquidate bid
+    #[msg("This bids holds too much value to be liquidated.")]
+    AboveLiquidationMargin,
+
+
     // Break of invariant of the data structures
     #[msg("Data structure invariant broken: there should be no deposit amounts in a withdraw request.")]
     ShouldBeNoDepositAmounts,
