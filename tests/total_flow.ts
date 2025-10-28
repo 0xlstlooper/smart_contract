@@ -166,8 +166,67 @@ describe("test place bid", () => {
     assert.ok(assetInfo.mint.equals(mintAsset2), "Mint public key for asset 2 should match");
   });
 
+
+  it("Places a bid for the first asset", async () => {
+
+    // Define bid parameters
+    const assetIndex = new anchor.BN(0); // First asset added
+    const slotIndex = new anchor.BN(0); // e.g., represents 1.10%
+    const bidAmount = new anchor.BN(100 * 10 ** 6); // Bid 100 tokens
+
+    // Derive PDA for the lender's deposit "ticket"
+    const [looperDepositPda] = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from("looper_deposit"),
+        payer.publicKey.toBuffer(),
+        assetIndex.toBuffer("le", 8), // asset must be little-endian 8 bytes
+        slotIndex.toBuffer("le", 8), // tick must be little-endian 8 bytes
+      ],
+      program.programId
+    );
+
+    // // Derive PDAs for initialization
+    // [allAssetsPda] = anchor.web3.PublicKey.findProgramAddressSync(
+    //   [Buffer.from("all_assets"), baseAsset.toBuffer()],
+    //   program.programId
+    // );
+
+    let allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
+    console.log("Orderbook Account before the asset deposited:", allAssetsData.assets[assetIndex.toNumber()].orderbook.slots);
+
+    // Call the place_bid instruction
+    const tx = await program.methods
+      .placeBid(assetIndex, slotIndex, bidAmount)
+      .accounts({
+        payer: payer.publicKey,
+        allAssets: allAssetsPda,
+        vaultAuthority: vaultAuthorityPda,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .rpc();
+
+    console.log("Place Bid transaction signature", tx);
+
+    allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
+    console.log("Orderbook Account after the asset deposited:", allAssetsData.assets[assetIndex.toNumber()].orderbook.slots);
+
+    // Verify the state of the orderbook and lender deposit
+    allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
+
+    assert.ok(allAssetsData.assets[assetIndex.toNumber()].orderbook.slots[slotIndex.toNumber()].eq(bidAmount), "Orderbook slot should be updated with the bid amount");
+
+    const looperDepositAccount = await program.account.looperDeposit.fetch(looperDepositPda);
+    assert.ok(looperDepositAccount.looper.equals(payer.publicKey), "Lender should be the payer");
+    assert.ok(looperDepositAccount.amount.eq(bidAmount), "Lender deposit amount should match bid amount");
+    assert.ok(looperDepositAccount.slotIndex.eq(slotIndex), "Lender deposit slot index should match bid slot index");
+    
+    
+  });
+
   it("Deposits and withdraws an asset", async () => {
-    const depositAmount = new anchor.BN(100 * 10 ** 6); // 100 tokens with 6 decimals
+    const depositAmount = new anchor.BN(10);
 
     // Create a token account for the payer and mint some tokens to it
     sourceAccount = await createAssociatedTokenAccount(
@@ -253,7 +312,7 @@ describe("test place bid", () => {
     // assert.strictEqual(vaultBalanceAfterDeposit.toString(), new anchor.BN(initialVaultBalance.toString()).add(depositAmount).toString(), "Vault balance should increase after deposit");
 
     // --- Withdraw Asset 1 ---
-    const withdrawAmount = new anchor.BN(50 * 10 ** 6); // Half of the deposited amount
+    const withdrawAmount = new anchor.BN(5); // Half of the deposited amount
 
     await program.methods
       .withdraw(withdrawAmount) // The total amount to withdraw
@@ -287,64 +346,6 @@ describe("test place bid", () => {
     // Todo, once the code is all_assets.rs, re enable these assertions
     // assert.strictEqual(userBalanceAfterWithdraw.toString(), new anchor.BN(userBalanceAfterDeposit.toString()).add(withdrawAmount).toString(), "User balance should increase after withdraw");
     // assert.strictEqual(vaultBalanceAfterWithdraw.toString(), new anchor.BN(vaultBalanceAfterDeposit.toString()).sub(withdrawAmount).toString(), "Vault balance should decrease after withdraw");
-  });
-
-  it("Places a bid for the first asset", async () => {
-
-    // Define bid parameters
-    const assetIndex = new anchor.BN(0); // First asset added
-    const slotIndex = new anchor.BN(0); // e.g., represents 1.10%
-    const bidAmount = new anchor.BN(100 * 10 ** 6); // Bid 100 tokens
-
-    // Derive PDA for the lender's deposit "ticket"
-    const [looperDepositPda] = anchor.web3.PublicKey.findProgramAddressSync(
-      [
-        Buffer.from("looper_deposit"),
-        payer.publicKey.toBuffer(),
-        assetIndex.toBuffer("le", 8), // asset must be little-endian 8 bytes
-        slotIndex.toBuffer("le", 8), // tick must be little-endian 8 bytes
-      ],
-      program.programId
-    );
-
-    // // Derive PDAs for initialization
-    // [allAssetsPda] = anchor.web3.PublicKey.findProgramAddressSync(
-    //   [Buffer.from("all_assets"), baseAsset.toBuffer()],
-    //   program.programId
-    // );
-
-    let allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
-    console.log("Orderbook Account before the asset deposited:", allAssetsData.assets[assetIndex.toNumber()].orderbook.slots);
-
-    // Call the place_bid instruction
-    const tx = await program.methods
-      .placeBid(assetIndex, slotIndex, bidAmount)
-      .accounts({
-        payer: payer.publicKey,
-        allAssets: allAssetsPda,
-        vaultAuthority: vaultAuthorityPda,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .rpc();
-
-    console.log("Place Bid transaction signature", tx);
-
-    allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
-    console.log("Orderbook Account after the asset deposited:", allAssetsData.assets[assetIndex.toNumber()].orderbook.slots);
-
-    // Verify the state of the orderbook and lender deposit
-    allAssetsData = await program.account.allAssets.fetch(allAssetsPda);
-
-    assert.ok(allAssetsData.assets[assetIndex.toNumber()].orderbook.slots[slotIndex.toNumber()].eq(bidAmount), "Orderbook slot should be updated with the bid amount");
-
-    const looperDepositAccount = await program.account.looperDeposit.fetch(looperDepositPda);
-    assert.ok(looperDepositAccount.looper.equals(payer.publicKey), "Lender should be the payer");
-    assert.ok(looperDepositAccount.amount.eq(bidAmount), "Lender deposit amount should match bid amount");
-    assert.ok(looperDepositAccount.slotIndex.eq(slotIndex), "Lender deposit slot index should match bid slot index");
-    
-    
   });
 
 });
