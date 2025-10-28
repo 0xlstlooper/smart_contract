@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use crate::errors::ErrorCode;
 use crate::constants::*;
+use crate::utility::update_multiplier;
 
 pub const MAX_ASSETS: u64 = 2;
 pub const ORDERBOOK_SIZE: usize = 10;
@@ -12,14 +13,15 @@ The last index is the highest APY offered - index i corresponds to start_tick + 
 #[account]
 #[derive(InitSpace)]
 pub struct Orderbook {
-    pub slots:             [u64; ORDERBOOK_SIZE],
-    pub looper_multiplier: [u64; ORDERBOOK_SIZE],
+    pub slots:              [u64; ORDERBOOK_SIZE],
+    pub looper_multiplier:  [u64; ORDERBOOK_SIZE],
+    pub low_position_decay: [u64; ORDERBOOK_SIZE], // When multiple positions shares the same last slot, we split the leverage among them, so we have this decay multiplier to do so
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct AssetInfo {
     pub mint: Pubkey,
-    pub leverage: u64, // Related to the LTV of the asset
+    pub leverage: u64,     // Related to the LTV of the asset - leverage of all other selectionned positions
     pub orderbook: Orderbook,
 }
 
@@ -46,31 +48,49 @@ pub struct AllAssets {
 */
 
 impl AllAssets {
-    // Todo update aussi tous les multipliers de tous les assets selectionnés par l'enchere
     pub fn update_timestamp_and_multiplier(&mut self) -> Result<()> {
         let current_timestamp = Clock::get()?.unix_timestamp;
         let time_elapsed = current_timestamp.checked_sub(self.last_update_timestamp).ok_or(ErrorCode::NumErr)?;
         if time_elapsed > 0 && self.amount > 0 {
-            // Todo checker les maths
-            // Update the global multiplier based on time elapsed
-            let interest_rate_per_second = self.current_apy()?
-                .checked_div(SCALE_APY)
-                .ok_or(ErrorCode::NumErr)?; // in per seconds
-            let additional_multiplier = (interest_rate_per_second as u128)
-                .checked_mul(time_elapsed as u128)
-                .ok_or(ErrorCode::NumErr)?
-                .checked_mul(self.lender_multiplier as u128)
-                .ok_or(ErrorCode::NumErr)?
-                .checked_div(SCALE_MULTIPLIER as u128)
-                .ok_or(ErrorCode::NumErr)? as u64;
-            self.lender_multiplier = self.lender_multiplier.checked_add(additional_multiplier).ok_or(ErrorCode::NumErr)?;
+            self.lender_multiplier = update_multiplier(
+                self.current_apy()?,
+                time_elapsed,
+                self.lender_multiplier,
+            )? as u64;
             self.last_update_timestamp = current_timestamp;
         }
+        // Update looper multipliers
+        self.update_looper_multiplier(time_elapsed)?;
         Ok(())
     }
 
     pub fn current_apy(&self) -> Result<u64> {
         Ok(self.start_tick)
+    }
+
+    pub fn update_looper_multiplier(&mut self, time_elapsed: i64) -> Result<()> {
+        let current_split = self.split_lenders_sol()?;
+        for i in 0..self.size_assets as usize {
+            let asset = &mut self.assets[i];
+            let (_tick_index, amount, last_liquidity) = current_split[i];
+            let tick_index = _tick_index as usize;
+            if amount > 0 {
+                // Update all the ticks above and including tick_index
+                for j in (tick_index)..ORDERBOOK_SIZE {
+                    let apy = self.start_tick + (j as u64) * self.tick_size;
+                    asset.orderbook.looper_multiplier[j] = update_multiplier(
+                        apy,
+                        time_elapsed,
+                        asset.orderbook.looper_multiplier[j],
+                    )? as u64;
+                }
+                // Update the decay for the current tick
+                asset.orderbook.low_position_decay[tick_index] = asset.orderbook.low_position_decay[tick_index]
+                    .checked_mul(last_liquidity).ok_or(ErrorCode::NumErr)?
+                    .checked_div(asset.orderbook.slots[tick_index]).ok_or(ErrorCode::NumErr)?;
+            }
+        }
+        Ok(())
     }
 
 
@@ -120,13 +140,13 @@ impl AllAssets {
     // Takes the amount from self.amount in SOL to split on the orderbook by selecting the best APY available iteratively
     // Example: if the orderbook has 500 at 120% and 300 at 130%, and we want to split 600,
     //   we will take 500 at 120% and 100 at 130%
-    // Need to return an array of (tick_index, amount), which represents for each assets
-    //   upon which tick we selected their liquidity, and what amount we took from it
+    // Need to return an array of (tick_index, amount, last_liquidity), which represents for each assets
+    //   upon which tick we selected their liquidity, what amount we took from it, and how much liquidity was left in this tick after our selection
     // So: the sum all amounts must be equal to the input amount
     // Result is a vector of size all_assets.size_assets
     // @Audrey
-    pub fn split_lenders_sol(&self) -> Result<Vec<(u64, u64)>> {
-        let mut result: Vec<(u64, u64)> = vec![(0, 0); self.size_assets as usize];
+    pub fn split_lenders_sol(&self) -> Result<Vec<(u64, u64, u64)>> {
+        let mut result: Vec<(u64, u64, u64)> = vec![(0, 0, 0); self.size_assets as usize];
         Ok(result)
     }
 
@@ -169,7 +189,8 @@ mod tests {
                     leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],
-                        looper_multiplier: [1; ORDERBOOK_SIZE],
+                        looper_multiplier: [START_MULTIPLIER_VALUE; ORDERBOOK_SIZE],
+                        low_position_decay: [START_DECAY_VALUE; ORDERBOOK_SIZE],
                     },
                 },
                 AssetInfo {
@@ -177,7 +198,8 @@ mod tests {
                     leverage: 1,
                     orderbook: Orderbook {
                         slots: [0; ORDERBOOK_SIZE],
-                        looper_multiplier: [1; ORDERBOOK_SIZE],
+                        looper_multiplier: [START_MULTIPLIER_VALUE; ORDERBOOK_SIZE],
+                        low_position_decay: [START_DECAY_VALUE; ORDERBOOK_SIZE],
                     },
                 },
             ],
@@ -185,7 +207,7 @@ mod tests {
             start_tick: 100,
             tick_size: 10,
             amount: 0,
-            lender_multiplier: 1,
+            lender_multiplier: START_MULTIPLIER_VALUE,
             last_update_timestamp: 0,
         }
     }
@@ -214,16 +236,20 @@ mod tests {
         // Orderbook for asset0: [500, 400, 100, 0, 0, 0, 0, 0, 0, 0]
         // Aka, 500amount of liquidity at tick 0 (100%), 400 at tick 1 (110%), 100 at tick 2 (120%)
 
-        all_assets.amount = 600;
+        all_assets.amount = 500;
         let result = all_assets.split_lenders_sol().unwrap();
-        // For asset0, we should take 500 from tick 0 and 100 from tick 1
-        // so the result for asset0 is (1, 600)
-        // For asset1, there is no liquidity, so (0, 0) - but it doesnt matter so if your implem returns smth else when the amount of liquidity is 0 its correct also and just change the test
-        assert_eq!(result, vec![(1, 600), (0, 0)]);
+        // For asset0, we should take 100 from tick 2, and 400 from tick 1
+        // so the result for asset0 is (1, 500, 400)
+        // For asset1, there is no liquidity, so (0, 0, 0) - but it doesnt matter so if your implem returns smth else when the amount of liquidity is 0 its correct also and just change the test
+        assert_eq!(result, vec![(1, 500, 400), (0, 0, 0)]);
 
-        all_assets.amount = 400;
+        all_assets.amount = 300;
         let result = all_assets.split_lenders_sol().unwrap();
-        assert_eq!(result, vec![(1, 400), (0, 0)]);
+        assert_eq!(result, vec![(1, 300, 200), (0, 0, 0)]);
+
+        all_assets.amount = 100;
+        let result = all_assets.split_lenders_sol().unwrap();
+        assert_eq!(result, vec![(2, 100, 100), (0, 0, 0)]);
 
         // Orderbook for asset1: [100, 100, 200, 300, 0, 0, 0, 0, 0, 0]
         all_assets.assets[1].orderbook.slots[0] = 100;
@@ -235,13 +261,13 @@ mod tests {
         all_assets.amount = 100;
         let result = all_assets.split_lenders_sol().unwrap();
         // The best APY is now from asset1 at tick 3, so we should take 100 from there
-        assert_eq!(result, vec![(0, 0), (3, 100)]);
+        assert_eq!(result, vec![(0, 0, 0), (3, 100, 100)]);
 
         all_assets.amount = 600;
         let result = all_assets.split_lenders_sol().unwrap();
         // We should take 300 from tick 3 of asset1, we now have 300 left to split
         // The next best APY is tick 2 of asset1, so we take 200 from there, 100 left
         // The next best APY is tick 2 of asset0, so we take 100 from there, 0 left - done
-        assert_eq!(result, vec![(2, 100), (3, 500)]);
+        assert_eq!(result, vec![(2, 100, 100), (3, 500, 200)]);
     }
 }

@@ -45,7 +45,28 @@ All in all, at equilibrum, we except the whole structure to be quite stable, req
 
 ## How it works - technical POV
 
-todo
+The tricky part of this protocol is how we organise the auction between the yield farmors. Essentially, the looping market of lending platform is already an auction in itself, people who want to propose a better supply APY to lenders can join, push the supply APY up, and any yield farmor who is now disatisfied with the new borrow APY can leave. This auction mechanism is a bit toxic because as a yield farmor I want to join if and only if I can make money, I don't want to join a market where suddently an asset provider drops an incentive and push everyone who is not on this asset out of profitability.  
+The key part for this protocol to work in our opinion is to organize healthy auctions.
+
+We have decided to organize the auction as follow:
++ Any yield farmor come with its asset and propose to pay a fixed APY. This forms an **orderbook**.
++ The auction, who has to distribute X amount of liquidity from lenders, just take the best available best fixed APY, with a cap on how much each asset can be in % of the total pool (eg a given asset can be at most 20% of the total pool to reduce total risk).
++ The resulting APY paid from yield farmor is the lowest selectionned for their given asset.
++ The resulting APY obtained by lenders is the blend of the APY paid by yield farmors.
++ If too much liquidity has to be split between multiple yield farmors, we split it evenly and reduce their leverage.
+
+Let's explain each decision:
++ First, the APY paid by yield farmors. It has to be the lowest, because it can't be the highest because else someone can place an offer to pay 100% to drive the price of everyone else. It also can't be what each yield farmor proposed to pay, because else they'll just adjust their offer to be at the lowest APY (and same justification for why it can't be anything else than the lowest, the cost to switch your offer if you don't change the split of the pool is none so you can just switch constantly). So its the 
++ The APY paid by yield farmors is isolated per asset, eg the APY paid by JupSol yield farmors can be 8% whereas APY paid by JitoSol is only 7%. This is done in order to give full exposure to lenders to the actually best blend APY available, if an incentives is available on only some asset but not all, we want to give this yield to lenders instead of gifting them to yield farmors.
++ "If too much liquidity has to be split between multiple yield farmors, we split it evenly and reduce their leverage". Well, it was unclear what else to do, not huge fan of first come first serve, and if they want a better leverage they can move their offer up. We do that with the parameter `low_position_decay` of the structure `Orderbook`.
+
+Now that the auction is done, how do we split lenders' assets?
++ First, the way to pay yield farmors it to give them additionnal exposure to their deposited asset, so if they deposit 1JitoSol they'll have an exposure of 10JitoSol and we have to swap 10Sol of lenders' asset to JitoSol. But how?
++ In the protocol, there is a function that takes the total number of deposit, and the orderbook, and decide how these deposits must be splitted.
++ Each time someone interact with the protocol, how deposits must be splitted may change, and this change needs to be done by whoever deposit. Assume for instance, you are a lender, you deposit 1Sol, the protocol needs to swap your 1Sol to 1JitoSol, then you actually need to deposit 1JitoSol and the frontend will do the swap for you (not the protocol itself). Assume next someone proposes a higher APY but with JupSol, then this person is responssible do the swap of 1JitoSol to 1JupSol (this can lead to some issues, described just below).
+
+
+
 
 ### Flow of use of the functions of the contract
 

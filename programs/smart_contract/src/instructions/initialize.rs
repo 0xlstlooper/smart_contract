@@ -42,7 +42,7 @@ pub fn handler(ctx: Context<Initialize>, start_tick: u64, tick_size: u64) -> Res
     all_assets.start_tick = start_tick;
     all_assets.tick_size = tick_size;
     all_assets.amount = 0;
-    all_assets.lender_multiplier = SCALE_MULTIPLIER;
+    all_assets.lender_multiplier = START_MULTIPLIER_VALUE;
     all_assets.last_update_timestamp = Clock::get()?.unix_timestamp;
 
     Ok(())

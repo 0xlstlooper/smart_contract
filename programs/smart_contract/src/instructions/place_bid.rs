@@ -103,6 +103,7 @@ pub fn handler<'info>(
     looper_deposit.slot_index = slot_index as u64;
     looper_deposit.amount = amount;
     looper_deposit.last_multiplier = ctx.accounts.all_assets.assets[asset_index].orderbook.looper_multiplier[slot_index];
+    looper_deposit.last_decay = ctx.accounts.all_assets.assets[asset_index].orderbook.low_position_decay[slot_index];
     looper_deposit.bump = ctx.bumps.looper_deposit;
 
     Ok(())

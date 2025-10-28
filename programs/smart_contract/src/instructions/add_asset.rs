@@ -70,8 +70,9 @@ pub fn handler(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
     asset.mint = ctx.accounts.mint_asset.key();
     asset.leverage = leverage;
     asset.orderbook = Orderbook {
-        slots: [0; ORDERBOOK_SIZE],
-        looper_multiplier: [SCALE_MULTIPLIER; ORDERBOOK_SIZE],
+        slots: [0; ORDERBOOK_SIZE], // At first, 0 liq
+        looper_multiplier: [START_MULTIPLIER_VALUE; ORDERBOOK_SIZE],
+        low_position_decay: [START_DECAY_VALUE; ORDERBOOK_SIZE],
     };
     
 

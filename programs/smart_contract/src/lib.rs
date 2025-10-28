@@ -36,6 +36,7 @@ pub mod smart_contract {
     pub fn remove_bid<'info>(ctx: Context<'_, '_, 'info, 'info, RemoveBid<'info>>, asset_index: u64, slot_index: u64) -> Result<()> {
         instructions::remove_bid::handler(ctx, asset_index as usize, slot_index as usize)
     }
+    // Called by anyone to liquidate a position
     pub fn liquidate_bid<'info>(ctx: Context<'_, '_, 'info, 'info, LiquidateBid<'info>>, owner: Pubkey, asset_index: u64, slot_index: u64) -> Result<()> {
         instructions::liquidate_bid::handler(ctx, owner, asset_index as usize, slot_index as usize)
     }

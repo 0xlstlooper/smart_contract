@@ -51,6 +51,8 @@ pub fn handler<'info>(
 
     // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
+    ctx.accounts.looper_deposit.adjust_for_looper_multiplier(ctx.accounts.all_assets.assets[asset_index].orderbook.looper_multiplier[slot_index] as u128)?;
+    ctx.accounts.looper_deposit.adjust_for_decay(ctx.accounts.all_assets.assets[asset_index].orderbook.low_position_decay[slot_index] as u128)?;
 
     let amount = ctx.accounts.looper_deposit.amount;
     require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);

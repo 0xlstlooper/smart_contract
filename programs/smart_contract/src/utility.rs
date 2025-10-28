@@ -1,5 +1,4 @@
-// Is responsible for handling transfer in/out of SPL token
-// Sorry, probably not idiomatic Solana code, im from ethereum :)
+// Some functions we use everywhere
 
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
@@ -127,4 +126,22 @@ pub fn oracle_quote_price(asset: Pubkey) -> Result<u64> {
     // Placeholder function - in real implementation, would fetch price from oracle (and would have a cache because we may call it multiple times per tx)
     // With this placeholder value: 1 yield bearing asset = 1 underlying asset
     Ok(SCALE_ORACLE_VALUE)
+}
+
+// Todo verif ce calcul
+pub fn update_multiplier(apy: u64, time_elapsed: i64, start_multiplier: u64) -> Result<u64> {
+    let interest_rate_per_second = apy
+        .checked_div(SCALE_APY)
+        .ok_or(ErrorCode::NumErr)?; // in per seconds
+    let additional_multiplier = (interest_rate_per_second as u128)
+        .checked_mul(time_elapsed as u128)
+        .ok_or(ErrorCode::NumErr)?
+        .checked_mul(start_multiplier as u128)
+        .ok_or(ErrorCode::NumErr)? as u64;
+        // .checked_div(START_MULTIPLIER_VALUE as u128)
+        // .ok_or(ErrorCode::NumErr)? as u64;
+    let new_multiplier = start_multiplier
+        .checked_add(additional_multiplier)
+        .ok_or(ErrorCode::NumErr)?;
+    Ok(new_multiplier)
 }
