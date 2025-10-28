@@ -37,7 +37,7 @@ describe("test place bid", () => {
   let vaultAssetPda2: anchor.web3.PublicKey;
 
   // Set initial market parameters
-  const startTick = new anchor.BN(100); // e.g., represents 1.00%
+  const startApy = new anchor.BN(100); // e.g., represents 1.00%
   const tickSize = new anchor.BN(10); // e.g., represents 0.10%
 
   let sourceAccount: anchor.web3.PublicKey;
@@ -60,7 +60,7 @@ describe("test place bid", () => {
 
     // Call the initialize instruction
     const tx = await program.methods
-      .initialize(startTick, tickSize)
+      .initialize(startApy, tickSize)
       .accounts({
         payer: payer.publicKey,
         baseAsset: baseAsset,
@@ -75,8 +75,8 @@ describe("test place bid", () => {
 
     // Verify that the state was set correctly
     const allAssetsAccount = await program.account.allAssets.fetch(allAssetsPda);
-    assert.ok(allAssetsAccount.startTick.eq(startTick), "Start tick should match");
-    assert.ok(allAssetsAccount.tickSize.eq(tickSize), "Tick size should match");
+    assert.ok(allAssetsAccount.startApy.eq(startApy), "Start tick should match");
+    assert.ok(allAssetsAccount.apyTick.eq(tickSize), "Tick size should match");
     assert.equal(allAssetsAccount.sizeAssets, 0, "Initial last index should be 0");
   });
 

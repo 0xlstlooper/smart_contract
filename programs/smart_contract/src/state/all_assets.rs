@@ -7,8 +7,8 @@ pub const MAX_ASSETS: u64 = 2;
 pub const ORDERBOOK_SIZE: usize = 10;
 
 /*
-The first index is the lowest APY offered - this is start_tick
-The last index is the highest APY offered - index i corresponds to start_tick + i * tick_size
+The first index is the lowest APY offered - this is start_apy
+The last index is the highest APY offered - index i corresponds to start_apy + i * apy_tick
 */
 #[account]
 #[derive(InitSpace)]
@@ -21,7 +21,7 @@ pub struct Orderbook {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, InitSpace)]
 pub struct AssetInfo {
     pub mint: Pubkey,
-    pub leverage: u64,     // Related to the LTV of the asset - leverage of all other selectionned positions
+    pub leverage: u64, // Related to the LTV of the asset - leverage of all other selectionned positions
     pub orderbook: Orderbook,
 }
 
@@ -34,12 +34,13 @@ pub struct AllAssets {
     pub size_assets: u64,
     pub assets: [AssetInfo; MAX_ASSETS as usize], // Array filled only until size_assets - todo le transformer en vec
     // Information shared across all the orderbooks
-    pub start_tick: u64,
-    pub tick_size: u64,
+    pub start_apy: u64, // 100% is VALUE_100_PERCENT_APY
+    pub apy_tick: u64,
     // Total amount of SOL deposited by lenders in this market
-    pub amount: u64,            // Not used?
+    pub amount: u64,            // Used, but probably some precision errors with the tracking of interest
     pub lender_multiplier: u64, // Start at 1, increases over time to reflect interest accrued for the lenders
     pub last_update_timestamp: i64,
+    pub current_apy: u64,
 }
 
 /* Invariant of the structure:
@@ -51,25 +52,28 @@ impl AllAssets {
     pub fn update_timestamp_and_multiplier(&mut self) -> Result<()> {
         let current_timestamp = Clock::get()?.unix_timestamp;
         let time_elapsed = current_timestamp.checked_sub(self.last_update_timestamp).ok_or(ErrorCode::NumErr)?;
-        if time_elapsed > 0 && self.amount > 0 {
+        if time_elapsed > 0 {
+            self.amount = update_multiplier(
+                self.current_apy,
+                time_elapsed,
+                self.amount,
+            )? as u64;
             self.lender_multiplier = update_multiplier(
-                self.current_apy()?,
+                self.current_apy,
                 time_elapsed,
                 self.lender_multiplier,
             )? as u64;
             self.last_update_timestamp = current_timestamp;
         }
-        // Update looper multipliers
-        self.update_looper_multiplier(time_elapsed)?;
+        // Todo, voir pcq en fait faudrait calculer ce truc avant et apres, pcq le split peut se mettre à jour avec le calcul des taux d'interet - c'est un peu chiant donc on fait ça comme ça pour l'instant mais todo changer
+        let current_split = self.split_lenders_sol()?;
+        self.update_looper_multiplier(time_elapsed, &current_split)?;
+        // Update apy
+        self.update_apy(&current_split)?;
         Ok(())
     }
 
-    pub fn current_apy(&self) -> Result<u64> {
-        Ok(self.start_tick)
-    }
-
-    pub fn update_looper_multiplier(&mut self, time_elapsed: i64) -> Result<()> {
-        let current_split = self.split_lenders_sol()?;
+    pub fn update_looper_multiplier(&mut self, time_elapsed: i64, current_split: &Vec<(u64, u64, u64)>) -> Result<()> {
         for i in 0..self.size_assets as usize {
             let asset = &mut self.assets[i];
             let (_tick_index, amount, last_liquidity) = current_split[i];
@@ -77,7 +81,7 @@ impl AllAssets {
             if amount > 0 {
                 // Update all the ticks above and including tick_index
                 for j in (tick_index)..ORDERBOOK_SIZE {
-                    let apy = self.start_tick + (j as u64) * self.tick_size;
+                    let apy = self.start_apy + (j as u64) * self.apy_tick;
                     asset.orderbook.looper_multiplier[j] = update_multiplier(
                         apy,
                         time_elapsed,
@@ -93,6 +97,25 @@ impl AllAssets {
         Ok(())
     }
 
+    // Update self.current_apy based on the current split of lenders' SOL
+    pub fn update_apy(&mut self, current_split: &Vec<(u64, u64, u64)>) -> Result<()> {
+        let total_liquidity: u64 = current_split.iter().map(|&(_tick_index, amount, _last_liquidity)| amount).sum();
+        // Do the mean averaged by liquidity
+        if total_liquidity > 0 {
+            let mut new_apy: u128 = 0;
+            for i in 0..self.size_assets as usize {
+                let asset = &self.assets[i];
+                let (tick_index, amount, _last_liquidity) = current_split[i];
+                if amount > 0 {
+                    let apy = self.start_apy + (tick_index as u64) * self.apy_tick;
+                    new_apy = new_apy.checked_add((apy as u128)
+                        .checked_mul(amount as u128).ok_or(ErrorCode::NumErr)?).ok_or(ErrorCode::NumErr)?;
+                }
+            }
+            self.current_apy = (new_apy.checked_div(total_liquidity as u128).ok_or(ErrorCode::NumErr)?) as u64;
+        }
+        Ok(())
+    }
 
     // Returns (best_tick, index of the related asset, liquidity of this tick of this asset)
     // Maximize only the tick, not the liquidity - for the same tick, it does not matter which asset we choose
@@ -111,7 +134,7 @@ impl AllAssets {
 
                 // If we find the highest tick with liquidity for this asset, we can check if it's the new best overall
                 if liquidity > 0 {
-                    let current_apy = self.start_tick + (j as u64) * self.tick_size;
+                    let current_apy = self.start_apy + (j as u64) * self.apy_tick;
 
                     match best_offer {
                         Some((best_apy_so_far, _, _)) => {
@@ -204,11 +227,12 @@ mod tests {
                 },
             ],
             size_assets: 2, // 2 because we have 2 assets listed in this structure
-            start_tick: 100,
-            tick_size: 10,
+            start_apy: VALUE_100_PERCENT_APY,
+            apy_tick: VALUE_100_PERCENT_APY / 100,
             amount: 0,
             lender_multiplier: START_MULTIPLIER_VALUE,
             last_update_timestamp: 0,
+            current_apy: VALUE_100_PERCENT_APY,
         }
     }
 

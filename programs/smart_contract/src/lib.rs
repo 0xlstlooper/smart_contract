@@ -15,8 +15,8 @@ pub mod smart_contract {
     use super::*;
 
     // Initialize each market - only by admin
-    pub fn initialize(ctx: Context<Initialize>, start_tick: u64, tick_size: u64) -> Result<()> {
-        instructions::initialize::handler(ctx, start_tick, tick_size)
+    pub fn initialize(ctx: Context<Initialize>, start_apy: u64, apy_tick: u64) -> Result<()> {
+        instructions::initialize::handler(ctx, start_apy, apy_tick)
     }
     // Add an asset to a market - only by admin
     pub fn add_asset(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {

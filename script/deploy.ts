@@ -10,7 +10,7 @@ describe("smart_contract", () => {
   const payer = provider.wallet.publicKey;
 
   it("Is initialized!", async () => {
-    const startTick = new anchor.BN(100);
+    const startApy = new anchor.BN(100);
     const tickSize = new anchor.BN(10);
 
     const [configPda] = await anchor.web3.PublicKey.findProgramAddress(
@@ -24,7 +24,7 @@ describe("smart_contract", () => {
     );
 
     const tx = await program.methods
-      .initialize(startTick, tickSize)
+      .initialize(startApy, tickSize)
       .accounts({
         payer: payer,
         config: configPda,

@@ -33,14 +33,14 @@ pub struct Initialize<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<Initialize>, start_tick: u64, tick_size: u64) -> Result<()> {
+pub fn handler(ctx: Context<Initialize>, start_apy: u64, apy_tick: u64) -> Result<()> {
     
     let all_assets = &mut ctx.accounts.all_assets;
     all_assets.base_asset = ctx.accounts.base_asset.key();
     all_assets.size_assets = 0;
     // all_assets.assets = [Default::default(); MAX_ASSETS];
-    all_assets.start_tick = start_tick;
-    all_assets.tick_size = tick_size;
+    all_assets.start_apy = start_apy;
+    all_assets.apy_tick = apy_tick;
     all_assets.amount = 0;
     all_assets.lender_multiplier = START_MULTIPLIER_VALUE;
     all_assets.last_update_timestamp = Clock::get()?.unix_timestamp;

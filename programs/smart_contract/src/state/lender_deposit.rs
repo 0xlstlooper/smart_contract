@@ -11,8 +11,8 @@ pub struct LenderDeposit {
 }
 
 impl LenderDeposit {
+    // Adjust the amount based on the change in global multiplier
     pub fn adjust_for_lender_multiplier(&mut self, current_lender_multiplier: u128) -> Result<()> {
-        // Adjust the amount based on the change in global multiplier
         let adjusted_amount = (self.amount as u128)
             .checked_mul(current_lender_multiplier)
             .ok_or(ErrorCode::NumErr)?

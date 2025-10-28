@@ -128,20 +128,20 @@ pub fn oracle_quote_price(asset: Pubkey) -> Result<u64> {
     Ok(SCALE_ORACLE_VALUE)
 }
 
-// Todo verif ce calcul
+// APY is scaled with VALUE_100_PERCENT_APY
+// Time elapsed is in seconds
 pub fn update_multiplier(apy: u64, time_elapsed: i64, start_multiplier: u64) -> Result<u64> {
-    let interest_rate_per_second = apy
-        .checked_div(SCALE_APY)
-        .ok_or(ErrorCode::NumErr)?; // in per seconds
-    let additional_multiplier = (interest_rate_per_second as u128)
+    let additional_multiplier = (start_multiplier as u128)
+        .checked_mul(apy as u128)
+        .ok_or(ErrorCode::NumErr)?
         .checked_mul(time_elapsed as u128)
         .ok_or(ErrorCode::NumErr)?
-        .checked_mul(start_multiplier as u128)
-        .ok_or(ErrorCode::NumErr)? as u64;
-        // .checked_div(START_MULTIPLIER_VALUE as u128)
-        // .ok_or(ErrorCode::NumErr)? as u64;
+        .checked_div(VALUE_100_PERCENT_APY as u128)
+        .ok_or(ErrorCode::NumErr)?
+        .checked_div(VALUE_SECONDS_IN_A_YEAR as u128)
+        .ok_or(ErrorCode::NumErr)?;
     let new_multiplier = start_multiplier
-        .checked_add(additional_multiplier)
+        .checked_add(additional_multiplier as u64)
         .ok_or(ErrorCode::NumErr)?;
     Ok(new_multiplier)
 }

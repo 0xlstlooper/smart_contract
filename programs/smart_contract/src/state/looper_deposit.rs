@@ -13,10 +13,9 @@ pub struct LooperDeposit {
     pub bump: u8,
 }
 
-// Todo factoriser cette merde avec LenderDeposit
 impl LooperDeposit {
+    // Adjust the amount based on the change in global multiplier
     pub fn adjust_for_looper_multiplier(&mut self, current_looper_multiplier: u128) -> Result<()> {
-        // Adjust the amount based on the change in global multiplier
         let adjusted_amount = (self.amount as u128)
             .checked_mul(current_looper_multiplier)
             .ok_or(ErrorCode::NumErr)?
@@ -29,8 +28,8 @@ impl LooperDeposit {
         Ok(())
     }
 
+    // Adjust the amount based on the change in low asset decay
     pub fn adjust_for_decay(&mut self, current_decay: u128) -> Result<()> {
-        // Adjust the amount based on the change in low asset decay
         let adjusted_amount = (self.amount as u128)
             .checked_mul(current_decay)
             .ok_or(ErrorCode::NumErr)?
