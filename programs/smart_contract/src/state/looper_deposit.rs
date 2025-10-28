@@ -1,12 +1,12 @@
-use anchor_lang::prelude::*;
 use crate::errors::ErrorCode;
+use anchor_lang::prelude::*;
 
 #[account]
 #[derive(InitSpace)]
 pub struct LooperDeposit {
     pub looper: Pubkey,
-    pub asset_index: u64, // Which asset we deposit
-    pub slot_index: u64,  // What APY we want to pay
+    pub asset_index: u64,     // Which asset we deposit
+    pub slot_index: u64,      // What APY we want to pay
     pub amount: u64,          // Value of the position
     pub last_multiplier: u64, // Value of the global multiplier at our last interaction - to pay our APY
     pub last_decay: u64,      // Value of the low asset decay at our last interaction
@@ -41,5 +41,4 @@ impl LooperDeposit {
 
         Ok(())
     }
-
 }

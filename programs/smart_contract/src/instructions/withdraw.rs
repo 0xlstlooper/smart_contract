@@ -1,16 +1,15 @@
+use crate::errors::ErrorCode;
+use crate::state::{AllAssets, LenderDeposit};
+use crate::utility::*;
 use anchor_lang::{prelude::*, system_program};
 use anchor_spl::{
     associated_token::AssociatedToken,
     token_interface::{Mint, TokenAccount, TokenInterface},
 };
-use crate::errors::ErrorCode;
-use crate::state::{AllAssets, LenderDeposit};
-use crate::utility::*;
 
 #[derive(Accounts)]
 #[instruction(amount: u64)]
 pub struct Withdraw<'info> {
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -45,17 +44,22 @@ pub struct Withdraw<'info> {
 // Structure of remaining_accounts: for each asset being withdrawn: [destination_account, vault_asset, mint_asset]
 pub fn handler<'info>(
     ctx: Context<'_, '_, 'info, 'info, Withdraw<'info>>,
-    amount: u64
+    amount: u64,
 ) -> Result<()> {
-
     // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
-    ctx.accounts.all_assets.amount = ctx.accounts.all_assets.amount.checked_sub(amount).ok_or(ErrorCode::NumErr)?;
+    ctx.accounts.all_assets.amount = ctx
+        .accounts
+        .all_assets
+        .amount
+        .checked_sub(amount)
+        .ok_or(ErrorCode::NumErr)?;
 
     // Update lender_deposit account
     let lender_deposit = &mut ctx.accounts.lender_deposit;
-    lender_deposit.adjust_for_lender_multiplier(ctx.accounts.all_assets.lender_multiplier as u128)?;
-    
+    lender_deposit
+        .adjust_for_lender_multiplier(ctx.accounts.all_assets.lender_multiplier as u128)?;
+
     // Now, the total money we can withdraw at max is lender_deposit.amount
     // To ease the user, if amount > lender_deposit.amount, we just withdraw all the money
     // - this is tricky for the frontend because well if amount changes, the delta_split changes too, so are the tokens we get and the swap we need to execute, but yeah
@@ -65,13 +69,20 @@ pub fn handler<'info>(
         amount
     };
     // Now, we proceed to the rest of the code
-    lender_deposit.amount = lender_deposit.amount.checked_sub(amount).ok_or(ErrorCode::InsufficientVaultFunds)?;
+    lender_deposit.amount = lender_deposit
+        .amount
+        .checked_sub(amount)
+        .ok_or(ErrorCode::InsufficientVaultFunds)?;
 
     // The amounts we are supposed to withdraw for each asset. `false` for withdrawal.
     let delta_split = ctx.accounts.all_assets.delta_split_lender(amount, false)?;
-    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
-    require!(deposit_amounts.len() == 0, ErrorCode::ShouldBeNoDepositAmounts);
-    
+    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) =
+        delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    require!(
+        deposit_amounts.len() == 0,
+        ErrorCode::ShouldBeNoDepositAmounts
+    );
+
     // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;
     let signer_seeds = &[&b"vault_authority"[..], &[bump]];

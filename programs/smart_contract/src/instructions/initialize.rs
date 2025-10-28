@@ -4,14 +4,13 @@ use anchor_spl::{
     token_interface::{Mint, TokenInterface},
 };
 
-use crate::state::{Orderbook, AllAssets};
 use crate::constants::*;
+use crate::state::{AllAssets, Orderbook};
 
 // Todo: make sure only admin can initialize
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -34,7 +33,6 @@ pub struct Initialize<'info> {
 }
 
 pub fn handler(ctx: Context<Initialize>, start_apy: u64, apy_tick: u64) -> Result<()> {
-    
     let all_assets = &mut ctx.accounts.all_assets;
     all_assets.base_asset = ctx.accounts.base_asset.key();
     all_assets.size_assets = 0;

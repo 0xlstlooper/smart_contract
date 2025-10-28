@@ -11,7 +11,7 @@ pub enum ErrorCode {
     AssetAlreadyInitialized,
     #[msg("The struct AllAssets is full")]
     AllAssetsIsFull,
-    
+
     // Deposit
     #[msg("Giiiirl pls deposit at least something 🐀")]
     LuserEstUnRat,
@@ -39,7 +39,6 @@ pub enum ErrorCode {
     // Liquidate bid
     #[msg("This bids holds too much value to be liquidated.")]
     AboveLiquidationMargin,
-
 
     // Break of invariant of the data structures
     #[msg("Data structure invariant broken: there should be no deposit amounts in a withdraw request.")]

@@ -1,4 +1,3 @@
-
 // Scale of the global multiplier
 pub const VALUE_100_PERCENT_APY: u64 = 1_000_000_000_000;
 

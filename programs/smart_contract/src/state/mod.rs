@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-pub mod all_assets; 
+pub mod all_assets;
 pub use all_assets::*;
 
 pub mod lender_deposit;

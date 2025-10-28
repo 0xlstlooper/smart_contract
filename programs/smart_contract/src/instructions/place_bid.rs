@@ -1,17 +1,16 @@
-use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
-};
+use crate::constants::*;
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::utility::*;
-use crate::constants::*;
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+};
 
 #[derive(Accounts)]
 #[instruction(asset_index: u64, slot_index: u64)]
 pub struct PlaceBid<'info> {
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -50,25 +49,31 @@ pub fn handler<'info>(
     slot_index: usize,
     amount: u64,
 ) -> Result<()> {
-
     // Update global multiplier - todo faudrait factoriser cette merde qq part
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
 
-    require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
+    require!(
+        asset_index < ctx.accounts.all_assets.size_assets as usize,
+        ErrorCode::InvalidAssetIndex
+    );
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
     require!(amount > MIN_DEPOSIT, ErrorCode::LuserEstUnRat);
 
     // Update the book
     let all_assets = &mut ctx.accounts.all_assets;
-    all_assets.assets[asset_index].orderbook.slots[slot_index] = all_assets.assets[asset_index].orderbook.slots[slot_index].checked_add(amount).ok_or(ErrorCode::NumErr)?;
+    all_assets.assets[asset_index].orderbook.slots[slot_index] =
+        all_assets.assets[asset_index].orderbook.slots[slot_index]
+            .checked_add(amount)
+            .ok_or(ErrorCode::NumErr)?;
 
     // Delta splits
     let delta_split = all_assets.delta_split_looper(asset_index, slot_index, amount, true)?;
-    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+    let ((deposit_amounts, deposit_mints), (withdraw_amounts, withdraw_mints)) =
+        delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
 
     // Split the remaining accounts accordingly between deposit and withdraw
-    let deposit_remaining_accounts = &ctx.remaining_accounts[0..3*deposit_amounts.len()];
-    let withdraw_remaining_accounts = &ctx.remaining_accounts[3*deposit_amounts.len()..];
+    let deposit_remaining_accounts = &ctx.remaining_accounts[0..3 * deposit_amounts.len()];
+    let withdraw_remaining_accounts = &ctx.remaining_accounts[3 * deposit_amounts.len()..];
 
     // Deposit
     manage_deposit(
@@ -102,8 +107,12 @@ pub fn handler<'info>(
     looper_deposit.asset_index = asset_index as u64;
     looper_deposit.slot_index = slot_index as u64;
     looper_deposit.amount = amount;
-    looper_deposit.last_multiplier = ctx.accounts.all_assets.assets[asset_index].orderbook.looper_multiplier[slot_index];
-    looper_deposit.last_decay = ctx.accounts.all_assets.assets[asset_index].orderbook.low_position_decay[slot_index];
+    looper_deposit.last_multiplier = ctx.accounts.all_assets.assets[asset_index]
+        .orderbook
+        .looper_multiplier[slot_index];
+    looper_deposit.last_decay = ctx.accounts.all_assets.assets[asset_index]
+        .orderbook
+        .low_position_decay[slot_index];
     looper_deposit.bump = ctx.bumps.looper_deposit;
 
     Ok(())

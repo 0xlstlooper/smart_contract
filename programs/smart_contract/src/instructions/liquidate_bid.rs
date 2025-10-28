@@ -1,17 +1,16 @@
-use anchor_lang::prelude::*;
-use anchor_spl::{
-    associated_token::AssociatedToken,
-    token_interface::{Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked},
-};
+use crate::constants::*;
 use crate::errors::ErrorCode;
 use crate::state::{AllAssets, LooperDeposit, Orderbook, ORDERBOOK_SIZE};
 use crate::utility::*;
-use crate::constants::*;
+use anchor_lang::prelude::*;
+use anchor_spl::{
+    associated_token::AssociatedToken,
+    token_interface::{transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked},
+};
 
 #[derive(Accounts)]
 #[instruction(owner: Pubkey, asset_index: u64, slot_index: u64)]
 pub struct LiquidateBid<'info> {
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -50,14 +49,24 @@ pub fn handler<'info>(
     asset_index: usize,
     slot_index: usize,
 ) -> Result<()> {
-
     // Update global multiplier
     ctx.accounts.all_assets.update_timestamp_and_multiplier()?;
-    ctx.accounts.to_liquidate.adjust_for_looper_multiplier(ctx.accounts.all_assets.assets[asset_index].orderbook.looper_multiplier[slot_index] as u128)?;
-    ctx.accounts.to_liquidate.adjust_for_decay(ctx.accounts.all_assets.assets[asset_index].orderbook.low_position_decay[slot_index] as u128)?;
+    ctx.accounts.to_liquidate.adjust_for_looper_multiplier(
+        ctx.accounts.all_assets.assets[asset_index]
+            .orderbook
+            .looper_multiplier[slot_index] as u128,
+    )?;
+    ctx.accounts.to_liquidate.adjust_for_decay(
+        ctx.accounts.all_assets.assets[asset_index]
+            .orderbook
+            .low_position_decay[slot_index] as u128,
+    )?;
 
     let amount = ctx.accounts.to_liquidate.amount;
-    require!(asset_index < ctx.accounts.all_assets.size_assets as usize, ErrorCode::InvalidAssetIndex);
+    require!(
+        asset_index < ctx.accounts.all_assets.size_assets as usize,
+        ErrorCode::InvalidAssetIndex
+    );
     require!(slot_index < ORDERBOOK_SIZE, ErrorCode::InvalidSlotIndex);
 
     if amount > LIQUIDATION_MARGIN {
@@ -68,16 +77,23 @@ pub fn handler<'info>(
 
     // Update the book
     let all_assets = &mut ctx.accounts.all_assets;
-    all_assets.assets[asset_index].orderbook.slots[slot_index] = all_assets.assets[asset_index].orderbook.slots[slot_index].checked_sub(amount).ok_or(ErrorCode::NumErr)?;
+    all_assets.assets[asset_index].orderbook.slots[slot_index] =
+        all_assets.assets[asset_index].orderbook.slots[slot_index]
+            .checked_sub(amount)
+            .ok_or(ErrorCode::NumErr)?;
 
     // Delta splits for withdrawal. `false` indicates a withdrawal.
     let delta_split = all_assets.delta_split_looper(asset_index, slot_index, amount, false)?;
-    
+
     // For a simple withdrawal, we expect the deposit part to be empty
-    let ((deposit_amounts, _), (withdraw_amounts, withdraw_mints)) = delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
-    
+    let ((deposit_amounts, _), (withdraw_amounts, withdraw_mints)) =
+        delta_split_extraction(&delta_split, &ctx.accounts.all_assets);
+
     // Ensure no deposits are being made - is it actually the case, todo verifier
-    require!(deposit_amounts.is_empty(), ErrorCode::ShouldBeNoDepositAmountsInRemoveBid);
+    require!(
+        deposit_amounts.is_empty(),
+        ErrorCode::ShouldBeNoDepositAmountsInRemoveBid
+    );
 
     // Prepare the signer seeds for the vault authority PDA
     let bump = ctx.bumps.vault_authority;

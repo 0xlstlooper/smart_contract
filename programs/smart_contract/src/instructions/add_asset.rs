@@ -1,16 +1,17 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token_interface::{ Mint, TokenAccount, TokenInterface, TransferChecked, transfer_checked};
+use anchor_spl::token_interface::{
+    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+};
 
-use crate::state::{Orderbook, AllAssets, MAX_ASSETS, ORDERBOOK_SIZE};
-use crate::errors::ErrorCode;
 use crate::constants::*;
+use crate::errors::ErrorCode;
+use crate::state::{AllAssets, Orderbook, MAX_ASSETS, ORDERBOOK_SIZE};
 
 // Todo faire en sorte que le payer est forcement l'admin du code et que n'importe quel jacky puisse pas call ce truc.
 
 #[derive(Accounts)]
 pub struct AddAsset<'info> {
-
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -50,7 +51,6 @@ pub struct AddAsset<'info> {
 }
 
 pub fn handler(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
-    
     require!(leverage > SCALE_LEVERAGE, ErrorCode::InvalidLeverage);
 
     let asset_idx = ctx.accounts.all_assets.size_assets;
@@ -59,7 +59,10 @@ pub fn handler(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
     // Verify asset is not initialized yet, aka if another asset has the same mint
     for i in 0..asset_idx as usize {
         let asset = &ctx.accounts.all_assets.assets[i];
-        require!(asset.mint != ctx.accounts.mint_asset.key(), ErrorCode::AssetAlreadyInitialized);
+        require!(
+            asset.mint != ctx.accounts.mint_asset.key(),
+            ErrorCode::AssetAlreadyInitialized
+        );
     }
 
     // Fill the datastructure with the new asset
@@ -74,7 +77,6 @@ pub fn handler(ctx: Context<AddAsset>, leverage: u64) -> Result<()> {
         looper_multiplier: [START_MULTIPLIER_VALUE; ORDERBOOK_SIZE],
         low_position_decay: [START_DECAY_VALUE; ORDERBOOK_SIZE],
     };
-    
 
     Ok(())
 }
