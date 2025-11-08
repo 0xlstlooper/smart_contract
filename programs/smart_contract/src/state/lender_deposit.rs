@@ -18,10 +18,10 @@ impl LenderDeposit {
             .ok_or(ErrorCode::NumErr)?
             .checked_div(self.last_multiplier as u128)
             .ok_or(ErrorCode::NumErr)? as u64;
+            
+            self.amount = adjusted_amount;
+            self.last_multiplier = current_lender_multiplier as u64;
 
-        self.amount = adjusted_amount;
-        self.last_multiplier = current_lender_multiplier as u64;
-
-        Ok(())
+            Ok(())
     }
 }

@@ -7,7 +7,20 @@ Problems we solve:
 With a **novel and unique defi primitive**, we solve them both at the same time (because they're two sides of the same coin actually).
 
 
+## High level pitch 
 
+Bonbon acts as a decentralised yield aggregator and as a platform to leverage your yield.
+
+Why would users want this? Well, people already give their money to centralised curator/managor to farm yield, and already deploy multiply loops to leverage their yield. I believe for both these use cases, Bonbon can offer an interesting alternative.
+
+It works by first asking "lenders" to deposit assets into the platform. Then, it organises an auction between all willing "yield farmers" who wish to leverage their yield in a multiply-loop fashion, at a certain fixed APY (that cannot increase). The winners of this auction are now leveraged, and lenders’ assets are distributed among the auction winners’ positions.  
+Thanks to its innovative auction design, yield farmers can safely participate in the protocol, in a set-and-forget way, and be assured they won’t lose money, while market forces ensure lenders receive a competitive blended APY reflecting the best DeFi positions currently available on-chain.
+
+Benefits are multiple.  
+For the decentralised yield aggregator part, you don't have to trust a curator anymore, that take a fee, deploy maybe too risky positions, can lose your funds, etc...  
+For the yield leverage part, it'd be much safer than the current option, the multiply loop. APYs of multiply loops can be negative, it's not so much set and forget, it can cost a lot to enter/exit the position, and because multiple assets compete to borrow the same assets at the same cost, for some of them it may be never be profitable (eg. if 10 LSTs with different APY compete to borrow the same SOL, only the most profitable one can be leveraged, whereas in your portfolio you want some diversification), and it also forbids safe but interesting option to have in your wallet (eg. a simple lend position).
+
+All in all, it solves both problems: lenders gain access to a decentralised yield aggregation mechanism, while yield farmers can safely leverage their yield.
 
 
 ## How it works? - high level POV
